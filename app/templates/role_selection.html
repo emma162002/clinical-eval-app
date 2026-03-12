@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Access – Clinical Evaluation{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white shadow rounded-lg p-8 border border-gray-100">
+  <h2 class="text-xl font-semibold text-gray-900 mb-2 text-center">
+    DECIPHER-M Clinical Evaluation
+  </h2>
+  <p class="text-sm text-gray-600 mb-6 text-center">
+    Select your role and sign in with your credentials.
+  </p>
+
+  <div class="space-y-4">
+    <a
+      href="{{ request.url_for('login_page') }}?role=doctor"
+      class="block w-full text-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Sign in as <strong>Doctor</strong>
+    </a>
+    <a
+      href="{{ request.url_for('login_page') }}?role=technician"
+      class="block w-full text-center px-4 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Sign in as <strong>Technician</strong>
+    </a>
+    <a
+      href="{{ request.url_for('login_page') }}?role=admin"
+      class="block w-full text-center px-4 py-3 border border-amber-200 text-base font-medium rounded-md text-amber-800 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+    >
+      Sign in as <strong>Admin</strong>
+    </a>
+  </div>
+
+  <p class="mt-6 text-xs text-gray-400 text-center">
+    After choosing a role you will be asked for username and password.
+  </p>
+</div>
+{% endblock %}

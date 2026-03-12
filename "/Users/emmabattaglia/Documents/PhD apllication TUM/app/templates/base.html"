@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}Clinical Model Evaluation{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}" />
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <div class="min-h-screen flex flex-col">
+      <header class="bg-white shadow">
+        <div class="max-w-6xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-semibold text-gray-900">
+              DECIPHER-M Clinical Evaluation
+            </h1>
+            <p class="text-sm text-gray-500">
+              Radiology model output review
+            </p>
+          </div>
+          <div class="text-xs text-gray-400">
+            Prototype – for assessment task only
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1">
+        <div class="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+
+      <footer class="bg-white border-t">
+        <div class="max-w-6xl mx-auto py-3 px-4 sm:px-6 lg:px-8 text-xs text-gray-400 flex justify-between">
+          <span>Clinical model evaluation workflow prototype</span>
+          <span>Data is stored locally in SQLite</span>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
+

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Home – Clinical Evaluation{% endblock %}
+{% block header_title %}Home{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="bg-white rounded-lg shadow p-6 border border-gray-100">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Welcome, {{ current_user.username }}</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      This application is for structured evaluation of multimodal oncology models
+      (radiology images + draft reports). As a clinician you will:
+      <br />
+      <span class="font-medium">1)</span> read the clinical prompt and model outputs,
+      <span class="font-medium">2)</span> score quality, accuracy, completeness and safety,
+      <span class="font-medium">3)</span> choose which report you would sign,
+      <span class="font-medium">4)</span> optionally mark a region of interest (ROI) on the image
+      and leave free-text feedback.
+    </p>
+    <div class="grid grid-cols-2 gap-4 max-w-md">
+      <div class="bg-blue-50 rounded-lg p-4">
+        <p class="text-2xl font-bold text-blue-700">{{ user_evaluations_count }}</p>
+        <p class="text-sm text-blue-900">Submitted evaluations</p>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-4">
+        <p class="text-2xl font-bold text-slate-700">{{ total_cases }}</p>
+        <p class="text-sm text-slate-900">Available cases</p>
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    <a href="{{ request.url_for('evaluation_list') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+      Go to case evaluation
+    </a>
+    <a href="{{ request.url_for('my_activity') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50">
+      My activity
+    </a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,129 @@
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlmodel import Session, select
+
+from .database import get_session, init_db
+from .models import Case, Evaluation, ModelOutput
+from .seed import seed_if_empty
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
+app = FastAPI(title="Clinical Model Evaluation")
+
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+app.mount(
+    "/static",
+    StaticFiles(directory=str(BASE_DIR / "static")),
+    name="static",
+)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+    with Session(bind=get_session().__wrapped__.__self__.bind) as session:  # type: ignore[attr-defined]
+        seed_if_empty(session)
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
+
+
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request, session: SessionDep):
+    case = session.exec(select(Case)).first()
+    if not case:
+        return templates.TemplateResponse(
+            "empty.html", {"request": request}
+        )
+    return RedirectResponse(url=f"/cases/{case.id}", status_code=302)
+
+
+@app.get("/cases/{case_id}", response_class=HTMLResponse)
+def view_case(case_id: int, request: Request, session: SessionDep):
+    case = session.get(Case, case_id)
+    if not case:
+        return HTMLResponse("Case not found", status_code=404)
+
+    next_case = (
+        session.exec(
+            select(Case).where(Case.id > case_id).order_by(Case.id)
+        ).first()
+    )
+
+    return templates.TemplateResponse(
+        "case.html",
+        {
+            "request": request,
+            "case": case,
+            "outputs": case.outputs,
+            "next_case": next_case,
+        },
+    )
+
+
+@app.post("/cases/{case_id}/submit")
+def submit_case_evaluations(
+    case_id: int,
+    annotator_id: str = Form(...),
+    preferred_output_id: int | None = Form(default=None),
+    session: SessionDep = Depends(get_session),
+    request: Request | None = None,
+):
+    case = session.get(Case, case_id)
+    if not case:
+        return HTMLResponse("Case not found", status_code=404)
+
+    for output in case.outputs:
+        prefix = f"output_{output.id}_"
+        overall_quality = int(request.form()[prefix + "overall_quality"])  # type: ignore[union-attr]
+        clinical_accuracy = int(request.form()[prefix + "clinical_accuracy"])  # type: ignore[union-attr]
+        completeness = int(request.form()[prefix + "completeness"])  # type: ignore[union-attr]
+        safety = int(request.form()[prefix + "safety"])  # type: ignore[union-attr]
+        hallucination = prefix + "hallucination" in request.form()  # type: ignore[union-attr]
+        missing_important_findings = (
+            prefix + "missing_important_findings" in request.form()  # type: ignore[union-attr]
+        )
+        formatting_issues = prefix + "formatting_issues" in request.form()  # type: ignore[union-attr]
+        safety_concerns = prefix + "safety_concerns" in request.form()  # type: ignore[union-attr]
+        free_text_feedback = request.form().get(prefix + "free_text_feedback")  # type: ignore[union-attr]
+
+        evaluation = Evaluation(
+            output_id=output.id,
+            annotator_id=annotator_id,
+            overall_quality=overall_quality,
+            clinical_accuracy=clinical_accuracy,
+            completeness=completeness,
+            safety=safety,
+            preferred_for_case=preferred_output_id == output.id,
+            hallucination=hallucination,
+            missing_important_findings=missing_important_findings,
+            formatting_issues=formatting_issues,
+            safety_concerns=safety_concerns,
+            free_text_feedback=free_text_feedback or None,
+        )
+        session.add(evaluation)
+
+    session.commit()
+
+    next_case = (
+        session.exec(
+            select(Case).where(Case.id > case_id).order_by(Case.id)
+        ).first()
+    )
+    if next_case:
+        return RedirectResponse(
+            url=f"/cases/{next_case.id}", status_code=303
+        )
+    return RedirectResponse(url="/thanks", status_code=303)
+
+
+@app.get("/thanks", response_class=HTMLResponse)
+def thanks(request: Request):
+    return templates.TemplateResponse("thanks.html", {"request": request})
+

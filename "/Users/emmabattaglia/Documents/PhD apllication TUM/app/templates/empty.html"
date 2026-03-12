@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}No Cases – Clinical Evaluation{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-lg p-8 border border-gray-100 text-center">
+  <h2 class="text-xl font-semibold text-gray-900 mb-3">
+    No cases available
+  </h2>
+  <p class="text-sm text-gray-600">
+    The database does not contain any sample cases. In the standard Docker
+    setup, cases are seeded automatically on startup. If you are seeing this
+    message inside the container, please check the application logs.
+  </p>
+</div>
+{% endblock %}
+

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}Clinical Model Evaluation{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <div class="min-h-screen flex">
+      {% if current_user is defined and current_user %}
+      <aside class="w-56 min-h-screen sticky top-0 bg-slate-900 text-slate-100 flex-shrink-0 flex flex-col shadow-lg">
+        <div class="p-4 border-b border-slate-700">
+          <h1 class="font-semibold text-sm">DECIPHER-M</h1>
+          <p class="text-xs text-slate-400">Clinical Evaluation</p>
+        </div>
+        <nav class="p-3 flex-1">
+          <p class="px-3 py-1 text-xs font-medium text-slate-300 uppercase tracking-wide">Sections</p>
+          {% if current_user.role == 'admin' %}
+          <a href="{{ request.url_for('admin_dashboard') }}" class="block px-3 py-2.5 rounded text-sm mt-1 {% if request.url.path == '/admin' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Dashboard</a>
+          <a href="{{ request.url_for('admin_progress') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/admin/progress' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Progress</a>
+          <a href="{{ request.url_for('admin_annotators') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/admin/annotators' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Annotators</a>
+          <a href="{{ request.url_for('admin_quality') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/admin/quality' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Data quality</a>
+          <a href="{{ request.url_for('admin_agreement') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/admin/agreement' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Inter-annotator agreement</a>
+          {% elif current_user.role == 'technician' %}
+          <a href="{{ request.url_for('help_inbox') }}" class="block px-3 py-2.5 rounded text-sm mt-1 {% if request.url.path.startswith('/help') %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Help desk</a>
+          <a href="{{ request.url_for('technician_models') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path.startswith('/technician/models') %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Model management</a>
+          {% else %}
+          <a href="{{ request.url_for('home') }}" class="block px-3 py-2.5 rounded text-sm mt-1 {% if request.url.path == '/home' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Home</a>
+          <a href="{{ request.url_for('evaluation_list') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path.startswith('/evaluation') %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Case evaluation</a>
+          <a href="{{ request.url_for('my_activity') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/activity' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">My activity</a>
+          <a href="{{ request.url_for('profile') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path == '/profile' %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Profile</a>
+          <a href="{{ request.url_for('help_entry') }}" class="block px-3 py-2.5 rounded text-sm {% if request.url.path.startswith('/help') %}bg-slate-100 text-slate-900{% else %}hover:bg-slate-800 text-slate-100{% endif %}">Help desk</a>
+          {% endif %}
+        </nav>
+        <div class="p-3 border-t border-slate-700 text-xs text-slate-400">
+          {{ 'Admin' if current_user.role == 'admin' else ('Doctor' if current_user.role == 'doctor' else 'Technician') }}: {{ current_user.username }}
+        </div>
+        <a href="{{ request.url_for('logout') }}" class="p-3 text-sm text-slate-300 hover:text-white border-t border-slate-700">Log out</a>
+      </aside>
+      {% endif %}
+      <div class="flex-1 flex flex-col min-w-0">
+        {% if current_user is defined and current_user %}
+        <header class="bg-white shadow-sm py-3 px-4">
+          <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-800">{% block header_title %}Clinical Evaluation{% endblock %}</h2>
+          </div>
+        </header>
+        {% endif %}
+        <main class="flex-1 py-6 px-4 sm:px-6 lg:px-8">
+          <div class="max-w-5xl mx-auto">
+            {% block content %}{% endblock %}
+          </div>
+        </main>
+
+        <footer class="bg-white border-t py-2 px-4 text-xs text-gray-400">
+          Clinical model evaluation · Data in SQLite
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
+

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Annotators – Admin{% endblock %}
+{% block header_title %}Annotators activity{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <p class="text-sm text-gray-600">
+    Activity per annotator: number of evaluations, first and last evaluation time.
+  </p>
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Annotator</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Evaluations</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">First</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Last</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for a in annotators %}
+        <tr>
+          <td class="px-4 py-2 font-medium text-gray-900">{{ a.annotator_id }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ a.evaluations_count }}</td>
+          <td class="px-4 py-2 text-sm text-gray-500">{{ a.first_at.strftime('%Y-%m-%d %H:%M') if a.first_at else '-' }}</td>
+          <td class="px-4 py-2 text-sm text-gray-500">{{ a.last_at.strftime('%Y-%m-%d %H:%M') if a.last_at else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No annotators yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

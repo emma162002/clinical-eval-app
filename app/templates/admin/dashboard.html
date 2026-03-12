@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard – Clinical Evaluation{% endblock %}
+{% block header_title %}Admin dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <p class="text-sm text-gray-600">
+    Overview of evaluation activity and data quality.
+  </p>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-blue-600">{{ total_cases }}</p>
+      <p class="text-sm text-gray-600 mt-1">Total cases</p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-slate-600">{{ total_evaluations }}</p>
+      <p class="text-sm text-gray-600 mt-1">Total evaluations</p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-emerald-600">{{ annotator_count }}</p>
+      <p class="text-sm text-gray-600 mt-1">Active annotators</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    <a href="{{ request.url_for('admin_progress') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Progress</a>
+    <a href="{{ request.url_for('admin_annotators') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Annotators</a>
+    <a href="{{ request.url_for('admin_quality') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Data quality</a>
+    <a href="{{ request.url_for('admin_agreement') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Inter-annotator agreement</a>
+  </div>
+</div>
+{% endblock %}

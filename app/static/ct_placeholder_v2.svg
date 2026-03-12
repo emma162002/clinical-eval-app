@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#000000"/>
+  <circle cx="400" cy="320" r="230" fill="#1f1f1f" stroke="#9ca3af" stroke-width="4"/>
+  <circle cx="320" cy="280" r="44" fill="#3f3f3f"/>
+  <circle cx="480" cy="280" r="44" fill="#3f3f3f"/>
+  <rect x="360" y="360" width="80" height="95" fill="#3f3f3f"/>
+  <text x="400" y="70" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    CT CHEST - LOCAL PLACEHOLDER
+  </text>
+</svg>
+

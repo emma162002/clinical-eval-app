@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Login – Clinical Evaluation{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white shadow rounded-lg p-8 border border-gray-100">
+  <h2 class="text-xl font-semibold text-gray-900 mb-1 text-center">
+    Sign in as {{ 'Doctor' if role == 'doctor' else ('Technician' if role == 'technician' else 'Admin') }}
+  </h2>
+  <p class="text-sm text-gray-500 mb-6 text-center">
+    Enter your username and password.
+  </p>
+
+  {% if error %}
+  <div class="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ request.url_for('login') }}" class="space-y-4">
+    <input type="hidden" name="role" value="{{ role }}" />
+    <div>
+      <label for="username" class="block text-sm font-medium text-gray-700 mb-1">
+        Username
+      </label>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        required
+        autocomplete="username"
+        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+        placeholder="e.g. doctor"
+      />
+    </div>
+    <div>
+      <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+        Password
+      </label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        required
+        autocomplete="current-password"
+        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+        placeholder="••••••••"
+      />
+    </div>
+    <button
+      type="submit"
+      class="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Sign in
+    </button>
+  </form>
+
+  <p class="mt-4 text-center">
+    <a href="{{ request.url_for('index') }}" class="text-sm text-gray-500 hover:text-gray-700">
+      ← Back to role selection
+    </a>
+  </p>
+
+  <p class="mt-6 text-xs text-gray-400 text-center">
+    Demo accounts: doctor / doctor123 · technician / technician123 · admin / admin123
+  </p>
+</div>
+{% endblock %}

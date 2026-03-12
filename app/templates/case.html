@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Case {{ case.id }} – Clinical Evaluation{% endblock %}
+{% block header_title %}Case evaluation {{ case.id }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <div class="flex items-center justify-between mb-2">
+    <h2 class="text-2xl font-semibold text-gray-900">
+      Case {{ case.id }} – {{ case.title }}
+    </h2>
+    {% if next_case %}
+    <div class="text-sm text-gray-500">
+      Next case: {{ next_case.title }}
+    </div>
+    {% endif %}
+  </div>
+  <p class="text-sm text-gray-500">
+    Please review the clinical prompt and model outputs below.
+    Rate each output independently and then choose which output you would
+    prefer to sign as the final report.
+  </p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  <div class="lg:col-span-2 bg-white shadow rounded-lg p-5 border border-gray-100">
+    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+      Clinical prompt
+    </h3>
+    <p class="text-gray-800 whitespace-pre-line">
+      {{ case.clinical_prompt }}
+    </p>
+  </div>
+  <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-900">
+    <h3 class="font-semibold mb-1">Instructions</h3>
+    <ul class="list-disc list-inside space-y-1">
+      <li>Enter your initials or site ID.</li>
+      <li>For each model output, rate quality, accuracy, completeness, and safety.</li>
+      <li>Flag specific error types if present.</li>
+      <li>Select which output you would prefer for this case.</li>
+      <li>Add optional free-text comments to capture nuanced feedback.</li>
+    </ul>
+  </div>
+</div>
+
+{% if not completed %}
+<form
+  method="post"
+  action="{{ request.url_for('submit_case_evaluations', case_id=case.id) }}"
+  class="space-y-6"
+  onsubmit="return confirm('Are you sure you want to submit these ratings? You will not be able to change them afterwards.');"
+>
+  <div class="bg-white shadow rounded-lg p-5 border border-gray-100">
+    <label class="block text-sm font-medium text-gray-700 mb-1" for="annotator_id">
+      Annotator ID (initials / site code)
+    </label>
+    <input
+      type="text"
+      id="annotator_id"
+      name="annotator_id"
+      value="{{ current_user.username if (current_user is defined and current_user) else '' }}"
+      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+      placeholder="e.g. EB, R1, SiteA-01"
+    />
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {% for output in outputs %}
+    <section class="bg-white shadow rounded-lg p-5 border border-gray-100">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold text-gray-900">
+          {{ output.model_name }}
+        </h3>
+        <div class="flex items-center space-x-2">
+          <input
+            type="radio"
+            id="preferred_{{ output.id }}"
+            name="preferred_output_id"
+            value="{{ output.id }}"
+            class="h-4 w-4 text-blue-600 border-gray-300"
+          />
+          <label for="preferred_{{ output.id }}" class="text-xs font-medium text-gray-700">
+            Preferred
+          </label>
+        </div>
+      </div>
+
+      {% if output.image_url %}
+      <div class="mb-3">
+        <div class="text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+          Representative image
+        </div>
+        <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-black" id="img-wrap-{{ output.id }}">
+          <img
+            id="img-{{ output.id }}"
+            src="{{ output.image_url }}"
+            alt="Case image for {{ case.title }}"
+            class="w-full object-contain max-h-72 mx-auto block"
+            onerror="this.style.display='none'; this.parentElement.querySelector('.img-fallback').style.display='flex';"
+          />
+          <canvas id="roi-canvas-{{ output.id }}" class="absolute inset-0 w-full h-full pointer-events-none hidden" style="max-height: 18rem;"></canvas>
+          <div class="img-fallback hidden items-center justify-center text-gray-200 text-xs h-48">
+            Image failed to load (offline-safe placeholder should appear after refresh).
+          </div>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          Image is illustrative and may represent a single key slice / sequence.
+        </p>
+        <div class="mt-2">
+          <button type="button" class="roi-toggle text-xs text-blue-600 hover:text-blue-800" data-output-id="{{ output.id }}">
+            Draw region of interest (ROI)
+          </button>
+          <div class="roi-form hidden mt-2 inline-flex items-center gap-2" id="roi-form-{{ output.id }}">
+            <input type="hidden" value="{{ output.id }}" id="roi-output-{{ output.id }}" />
+            <input type="hidden" id="roi-points-{{ output.id }}" value="[]" />
+            <button type="button" id="roi-save-{{ output.id }}" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
+              Save ROI
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="mb-4">
+        <div class="text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
+          Draft report text
+        </div>
+        <div class="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm text-gray-800 max-h-64 overflow-y-auto whitespace-pre-line">
+          {{ output.text_output }}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        {% for field_name, label in [
+          ('overall_quality', 'Overall quality'),
+          ('clinical_accuracy', 'Clinical accuracy'),
+          ('completeness', 'Completeness'),
+          ('safety', 'Safety / appropriateness')
+        ] %}
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            {{ label }} (1–5)
+          </label>
+          <select
+            name="output_{{ output.id }}_{{ field_name }}"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+          >
+            <option value="0" selected>— Not filled</option>
+            <option value="1">1 – Unacceptable</option>
+            <option value="2">2 – Poor</option>
+            <option value="3">3 – Borderline</option>
+            <option value="4">4 – Good</option>
+            <option value="5">5 – Excellent</option>
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+
+      <fieldset class="mb-3">
+        <legend class="text-xs font-medium text-gray-700 mb-2">
+          Error categories (check all that apply)
+        </legend>
+        <div class="space-y-1 text-xs text-gray-700">
+          <label class="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              name="output_{{ output.id }}_hallucination"
+              class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
+            />
+            <span>Hallucinated findings (describes abnormalities not present)</span>
+          </label>
+          <label class="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              name="output_{{ output.id }}_missing_important_findings"
+              class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
+            />
+            <span>Misses clinically important findings</span>
+          </label>
+          <label class="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              name="output_{{ output.id }}_formatting_issues"
+              class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
+            />
+            <span>Formatting / structure issues (hard to sign as-is)</span>
+          </label>
+          <label class="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              name="output_{{ output.id }}_safety_concerns"
+              class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
+            />
+            <span>Safety concern (would change urgent management if used)</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1" for="output_{{ output.id }}_free_text_feedback">
+          Optional comments on this output
+        </label>
+        <textarea
+          id="output_{{ output.id }}_free_text_feedback"
+          name="output_{{ output.id }}_free_text_feedback"
+          rows="3"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+          placeholder="E.g. good description but underestimates size; consider mentioning prior surgery; wording could be more concise."
+        ></textarea>
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+    <div class="text-xs text-gray-500">
+      You can submit even with partial input: all fields are optional. Submitting saves your answers and moves to the next case.
+    </div>
+    <button
+      type="submit"
+      class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Save ratings{% if next_case %} &amp; go to next case{% else %} &amp; finish{% endif %}
+    </button>
+  </div>
+</form>
+{% else %}
+<div class="bg-yellow-50 border border-yellow-200 text-yellow-900 text-sm rounded-lg p-4 mb-4">
+  You have already submitted ratings for this case in this session. To avoid
+  biasing the evaluation workflow, re‑rating is disabled. You can still view
+  this case and your saved decisions in the "My activity" section.
+</div>
+{% endif %}
+
+<div class="mt-4 text-sm text-gray-500">
+  <a href="{{ request.url_for('evaluation_list') }}" class="text-blue-600 hover:text-blue-800">← Back to case list</a>
+</div>
+
+<script>
+(function() {
+  document.querySelectorAll('.roi-toggle').forEach(function(btn) {
+    var outputId = btn.getAttribute('data-output-id');
+    var canvas = document.getElementById('roi-canvas-' + outputId);
+    var img = document.getElementById('img-' + outputId);
+    var form = document.getElementById('roi-form-' + outputId);
+    var pointsInput = document.getElementById('roi-points-' + outputId);
+    var saveBtn = document.getElementById('roi-save-' + outputId);
+    if (!canvas || !img || !form || !pointsInput || !saveBtn) return;
+    var wrap = canvas.parentElement;
+    var drawing = false;
+    var points = [];
+
+    function setCanvasSize() {
+      var r = wrap.getBoundingClientRect();
+      canvas.width = r.width;
+      canvas.height = r.height;
+      canvas.style.pointerEvents = canvas.classList.contains('hidden') ? 'none' : 'auto';
+    }
+
+    function norm(x, y) {
+      var r = wrap.getBoundingClientRect();
+      return { x: (x - r.left) / r.width, y: (y - r.top) / r.height };
+    }
+
+    function drawPath() {
+      var ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (points.length < 2) {
+        return;
+      }
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
+      for (var i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x * canvas.width, points[i].y * canvas.height);
+      }
+      ctx.stroke();
+    }
+
+    btn.addEventListener('click', function() {
+      canvas.classList.remove('hidden');
+      form.classList.remove('hidden');
+      setCanvasSize();
+    });
+
+    canvas.addEventListener('mousedown', function(e) {
+      drawing = true;
+      points = [];
+      points.push(norm(e.clientX, e.clientY));
+      drawPath();
+    });
+
+    canvas.addEventListener('mousemove', function(e) {
+      if (!drawing) return;
+      points.push(norm(e.clientX, e.clientY));
+      drawPath();
+    });
+
+    canvas.addEventListener('mouseup', function() {
+      if (!drawing) return;
+      drawing = false;
+      pointsInput.value = JSON.stringify(points);
+    });
+
+    saveBtn.addEventListener('click', function() {
+      if (!pointsInput.value || pointsInput.value === "[]") {
+        alert("Draw a ROI line on the image before saving.");
+        return;
+      }
+      var formData = new FormData();
+      formData.append("output_id", outputId);
+      formData.append("points_json", pointsInput.value);
+      fetch("{{ request.url_for('save_roi', case_id=case.id) }}", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      }).then(function(resp) {
+        if (!resp.ok) {
+          throw new Error("Failed to save ROI");
+        }
+        return resp.json();
+      }).then(function() {
+        // keep the evaluation form as is; optionally give a small confirmation
+        alert("ROI saved.");
+      }).catch(function() {
+        alert("Could not save ROI. Please try again.");
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}
+

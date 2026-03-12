@@ -1,0 +1,44 @@
+from datetime import datetime
+from typing import Optional
+
+from sqlmodel import Field, Relationship, SQLModel
+
+
+class Case(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    clinical_prompt: str
+    modality: str = "text+image"
+
+    outputs: list["ModelOutput"] = Relationship(back_populates="case")
+
+
+class ModelOutput(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    case_id: int = Field(foreign_key="case.id")
+    model_name: str
+    text_output: str
+    image_url: Optional[str] = None
+
+    case: Optional[Case] = Relationship(back_populates="outputs")
+    evaluations: list["Evaluation"] = Relationship(back_populates="output")
+
+
+class Evaluation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    output_id: int = Field(foreign_key="modeloutput.id")
+    annotator_id: str
+    overall_quality: int = Field(ge=1, le=5)
+    clinical_accuracy: int = Field(ge=1, le=5)
+    completeness: int = Field(ge=1, le=5)
+    safety: int = Field(ge=1, le=5)
+    preferred_for_case: bool = False
+    hallucination: bool = False
+    missing_important_findings: bool = False
+    formatting_issues: bool = False
+    safety_concerns: bool = False
+    free_text_feedback: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    output: Optional[ModelOutput] = Relationship(back_populates="evaluations")
+

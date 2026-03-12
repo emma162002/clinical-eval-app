@@ -1,0 +1,12 @@
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+textarea {
+  resize: vertical;
+}
+
+select {
+  background-image: none;
+}
+

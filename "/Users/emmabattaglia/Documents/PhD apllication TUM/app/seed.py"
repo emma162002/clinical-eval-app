@@ -1,0 +1,88 @@
+from sqlmodel import Session, select
+
+from .models import Case, ModelOutput
+
+
+SAMPLE_CASES = [
+    {
+        "title": "CT chest – lung nodule follow-up",
+        "clinical_prompt": (
+            "Compare current CT chest with prior study from 12 months ago. "
+            "Assess for interval change in size or character of the right upper lobe pulmonary nodule. "
+            "Comment on any new nodules or lymphadenopathy."
+        ),
+        "outputs": [
+            {
+                "model_name": "Model A",
+                "text_output": (
+                    "There is a 7 mm solid nodule in the right upper lobe, unchanged in size compared "
+                    "to prior exam. No new pulmonary nodules are identified. No mediastinal or hilar "
+                    "lymphadenopathy. No pleural effusion. Findings are compatible with benign-appearing "
+                    "stable nodule."
+                ),
+                "image_url": "https://prod-images-static.radiopaedia.org/images/24169332/07a5c6f6a4ca9e3664c2a8f3bcd99962c8a3c5a7c9c0f3520e596770b8f9f0d9",
+            },
+            {
+                "model_name": "Model B",
+                "text_output": (
+                    "Right upper lobe nodule has increased from 7 mm to 11 mm compared with prior exam. "
+                    "Multiple new bilateral pulmonary nodules are present. There is bulky mediastinal "
+                    "lymphadenopathy. Overall findings are suspicious for metastatic disease."
+                ),
+                "image_url": "https://prod-images-static.radiopaedia.org/images/24169332/07a5c6f6a4ca9e3664c2a8f3bcd99962c8a3c5a7c9c0f3520e596770b8f9f0d9",
+            },
+        ],
+    },
+    {
+        "title": "Brain MRI – acute stroke query",
+        "clinical_prompt": (
+            "Evaluate for acute ischemic stroke in a 72-year-old with left-sided weakness. "
+            "Comment on diffusion restriction, hemorrhage, and large vessel occlusion stigmata."
+        ),
+        "outputs": [
+            {
+                "model_name": "Model C",
+                "text_output": (
+                    "There is restricted diffusion in the right MCA territory involving the frontal and "
+                    "parietal lobes, consistent with acute ischemic infarct. No evidence of hemorrhagic "
+                    "transformation. No significant mass effect or midline shift."
+                ),
+                "image_url": "https://prod-images-static.radiopaedia.org/images/13063201/5eee26ca3673d299c24c45ea986166e24013c1ab2ff6a5a9cc67e8dd44323fdf",
+            },
+            {
+                "model_name": "Model D",
+                "text_output": (
+                    "Normal MRI of the brain without evidence of acute infarction, hemorrhage, or mass. "
+                    "Ventricles and sulci are normal for age."
+                ),
+                "image_url": "https://prod-images-static.radiopaedia.org/images/13063201/5eee26ca3673d299c24c45ea986166e24013c1ab2ff6a5a9cc67e8dd44323fdf",
+            },
+        ],
+    },
+]
+
+
+def seed_if_empty(session: Session) -> None:
+    existing = session.exec(select(Case)).first()
+    if existing:
+        return
+
+    for case_data in SAMPLE_CASES:
+        case = Case(
+            title=case_data["title"],
+            clinical_prompt=case_data["clinical_prompt"],
+            modality="text+image",
+        )
+        session.add(case)
+        session.flush()
+        for out in case_data["outputs"]:
+            session.add(
+                ModelOutput(
+                    case_id=case.id,
+                    model_name=out["model_name"],
+                    text_output=out["text_output"],
+                    image_url=out.get("image_url"),
+                )
+            )
+    session.commit()
+

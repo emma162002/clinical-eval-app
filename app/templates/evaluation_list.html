@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Case evaluation – Clinical Evaluation{% endblock %}
+{% block header_title %}Case evaluation{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <p class="text-sm text-gray-600">
+    Select a case to evaluate the model outputs (text and image). You can fill scores and preferences for each output.
+  </p>
+  <ul class="divide-y divide-gray-200 bg-white rounded-lg border border-gray-200 overflow-hidden">
+    {% for c in cases %}
+    <li>
+      <a href="{{ request.url_for('view_case', case_id=c.id) }}" class="block px-4 py-4 hover:bg-gray-50">
+        <div class="font-medium text-gray-900">Case {{ c.id }} – {{ c.title }}</div>
+        <div class="text-sm text-gray-500 mt-1">{{ c.clinical_prompt[:120] }}…</div>
+      </a>
+    </li>
+    {% else %}
+    <li class="px-4 py-8 text-center text-gray-500">No cases available.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

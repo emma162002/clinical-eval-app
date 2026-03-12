@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}My help requests – Clinical Evaluation{% endblock %}
+{% block header_title %}My help requests{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-gray-600">
+      Requests you have sent to technicians.
+    </p>
+    <a href="{{ request.url_for('help_new') }}" class="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700">
+      New request
+    </a>
+  </div>
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for t in tickets %}
+        <tr>
+          <td class="px-4 py-2 text-sm text-gray-600">
+            {{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '-' }}
+          </td>
+          <td class="px-4 py-2 text-sm">
+            <a href="{{ request.url_for('help_detail', ticket_id=t.id) }}" class="text-blue-600 hover:text-blue-800">
+              {{ t.subject }}
+            </a>
+          </td>
+          <td class="px-4 py-2 text-sm">
+            {{ t.status.capitalize() }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="3" class="px-4 py-8 text-center text-gray-500 text-sm">
+            No help requests yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
