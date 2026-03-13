@@ -11,6 +11,22 @@ Web app for **clinical evaluation of AI model outputs** (e.g. radiology report d
 Doctors: `doctor1` / `doctor2` / `doctor3` with password `doctor123`.  
 Admin: `admin` / `admin123`.
 
+## Architecture overview
+
+- **Backend:** FastAPI; session-based auth (Doctor / Admin). Data layer: SQLModel (SQLite), single DB file at `data/app.db`.
+- **Main modules:** `app/main.py` (routes, auth, admin logic), `app/models.py` (User, Case, ModelOutput, Evaluation, EvaluationROI, HelpRequest, RegisteredModel), `app/seed.py` (creates default users and sample cases on first run), `app/auth.py` (password hashing), `app/database.py` (engine, `init_db`).
+- **Frontend:** Jinja2 templates in `app/templates/` (Tailwind CSS), static files in `app/static/`.
+- **Docker:** `Dockerfile` (Python 3.11-slim, uvicorn on port 8000); `docker-compose.yml` builds the app and exposes 8000, mounts `./data` for the DB.
+
+## Sample data
+
+Sample data is created **automatically on first run** (no extra files to download). The seed (`app/seed.py`) runs at startup and, if the DB is empty:
+
+- **Users:** 3 doctors (`doctor1`, `doctor2`, `doctor3`) and 1 admin (`admin`), all with password `doctor123` / `admin123`.
+- **Cases:** 2 clinical cases with prompts and 2 model outputs each (e.g. CT chest lung nodule, Brain MRI stroke). Images use public-domain URLs or local placeholders.
+
+So after `docker-compose up --build` (or uvicorn), open http://localhost:8000 and log in with the credentials above to use the app with sample data.
+
 ## Features
 
 **Doctor**
