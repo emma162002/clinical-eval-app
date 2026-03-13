@@ -34,6 +34,7 @@ Admin: `admin` / `admin123`.
 
 **With Docker (recommended):**
 ```bash
+# Replace with the folder where you cloned or extracted the repo (e.g. cd ~/Downloads/clinical-eval-app)
 cd /path/to/clinical-eval-app
 docker-compose up --build
 ```
@@ -41,6 +42,7 @@ Then open in your browser: **http://localhost:8000**
 
 **Without Docker:**
 ```bash
+# Same: use the folder where the project is (e.g. cd ~/clinical-eval-app)
 cd /path/to/clinical-eval-app
 python -m venv .venv
 source .venv/bin/activate   # on Windows: .venv\Scripts\activate
