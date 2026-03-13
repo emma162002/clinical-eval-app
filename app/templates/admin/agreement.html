@@ -8,62 +8,65 @@
     Agreement metrics between annotators: for each output with at least 2 evaluations we show mean and variance of quality; per case we show agreement on the preferred output.
   </p>
 
-  <h3 class="font-semibold text-gray-900">Agreement per output (quality 1–5)</h3>
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Case</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Number of annotators</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mean quality</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Variance</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">% within 1 point</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for a in agreement %}
-        <tr>
-          <td class="px-4 py-2 text-sm">{{ a.case_id }} – {{ a.case_title[:30] }}…</td>
-          <td class="px-4 py-2 font-medium">{{ a.model_name }}</td>
-          <td class="px-4 py-2">{{ a.n_annotators }}</td>
-          <td class="px-4 py-2">{{ a.mean_quality }}</td>
-          <td class="px-4 py-2">{{ a.variance }}</td>
-          <td class="px-4 py-2">{{ a.pct_within_one }}%</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No outputs with at least 2 annotators.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% for case_num in [1, 2] %}
+  {% set agreement_case = agreement | selectattr('case_id', 'equalto', case_num) | list %}
+  {% set preferred_case = case_preferred | selectattr('case_id', 'equalto', case_num) | list %}
+  <section class="space-y-4">
+    <h3 class="font-semibold text-gray-900 text-lg">Case {{ case_num }}</h3>
 
-  <h3 class="font-semibold text-gray-900 mt-6">Preference agreement (per case)</h3>
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Case</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">N annotators</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preferred A</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preferred B</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">% agreement</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% for c in case_preferred %}
-        <tr>
-          <td class="px-4 py-2 text-sm">{{ c.case_id }} – {{ c.case_title[:35] }}…</td>
-          <td class="px-4 py-2">{{ c.n_annotators }}</td>
-          <td class="px-4 py-2">{{ c.preferred_a }}</td>
-          <td class="px-4 py-2">{{ c.preferred_b }}</td>
-          <td class="px-4 py-2">{{ c.pct_agreement }}%</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No cases with at least 2 annotators.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <h4 class="font-medium text-gray-800">Agreement per output (quality 1–5)</h4>
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Number of annotators</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mean quality</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Variance</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for a in agreement_case %}
+          <tr>
+            <td class="px-4 py-2 font-medium">{{ a.model_name }}</td>
+            <td class="px-4 py-2">{{ a.n_annotators }}</td>
+            <td class="px-4 py-2">{{ a.mean_quality }}</td>
+            <td class="px-4 py-2">{{ a.variance }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No outputs with at least 2 annotators.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <h4 class="font-medium text-gray-800">Preference agreement</h4>
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">N annotators</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preferred A</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preferred B</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">% agreement</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for c in preferred_case %}
+          <tr>
+            <td class="px-4 py-2">{{ c.n_annotators }}</td>
+            <td class="px-4 py-2">{{ c.preferred_a }}</td>
+            <td class="px-4 py-2">{{ c.preferred_b }}</td>
+            <td class="px-4 py-2">{{ c.pct_agreement }}%</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No preference data (need at least 2 annotators).</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% if not loop.last %}<hr class="border-gray-200 my-8" />{% endif %}
+  {% endfor %}
 </div>
 {% endblock %}

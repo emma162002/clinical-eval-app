@@ -21,11 +21,53 @@
       <p class="text-sm text-gray-600 mt-1">Active annotators</p>
     </div>
   </div>
-  <div class="flex flex-wrap gap-3">
+  <p class="text-xs text-gray-500 mt-2">
+    Each case has a different clinical question; models A and B are compared in one set of cases, C and D in another. &quot;Times preferred&quot; = how often this model was chosen as best for that case.
+  </p>
+
+  {% for case_num, section_label in [(1, 'Model A vs B'), (2, 'Model C vs D')] %}
+  {% set summaries = model_summaries_by_case.get(case_num, []) %}
+  <h3 class="text-base font-semibold text-gray-900 mt-6">{{ section_label }} – Average ratings per model</h3>
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mt-2">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Model</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Evaluations</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Times preferred</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Avg overall (1–5)</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Avg accuracy (1–5)</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Avg completeness (1–5)</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Avg safety (1–5)</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {% for s in summaries %}
+        <tr class="{{ 'bg-green-50 border-l-4 border-green-500' if s.is_most_preferred else '' }}">
+          <td class="px-4 py-2 font-medium text-gray-900">{{ s.model_name }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ s.evaluations_count }}</td>
+          <td class="px-4 py-2 font-semibold text-gray-900">{{ s.preferred_count }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ s.avg_overall }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ s.avg_accuracy }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ s.avg_completeness }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ s.avg_safety }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="px-4 py-6 text-center text-gray-500 text-sm">No evaluations for {{ section_label }} yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-green-700 mt-1">Green row = model(s) with the highest &quot;Times preferred&quot; in {{ section_label }}.</p>
+  {% endfor %}
+
+  <div class="flex flex-wrap gap-3 mt-6">
     <a href="{{ request.url_for('admin_progress') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Progress</a>
-    <a href="{{ request.url_for('admin_annotators') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Annotators</a>
     <a href="{{ request.url_for('admin_quality') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Data quality</a>
     <a href="{{ request.url_for('admin_agreement') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Inter-annotator agreement</a>
+    <a href="{{ request.url_for('admin_roi') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">ROI overlap</a>
+    <a href="{{ request.url_for('help_inbox') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Help desk</a>
+    <a href="{{ request.url_for('admin_models') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Model management</a>
   </div>
 </div>
 {% endblock %}

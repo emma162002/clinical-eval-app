@@ -5,24 +5,34 @@
 {% block content %}
 <div class="space-y-4">
   <p class="text-sm text-gray-600">
-    Number of evaluations per annotator (each case typically generates multiple evaluations, one per output).
+    Coverage per annotator: how many cases they have evaluated, how many outputs in total, and how their work is distributed across models.
   </p>
   <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
           <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Annotator</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Evaluations</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cases covered</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">% of total cases</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total evaluations</th>
+          {% for m in model_names %}
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ m }} evaluations</th>
+          {% endfor %}
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
         {% for p in progress %}
         <tr>
           <td class="px-4 py-2 font-medium text-gray-900">{{ p.annotator_id }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ p.cases_count }}</td>
+          <td class="px-4 py-2 text-gray-600">{{ p.completion_pct }}%</td>
           <td class="px-4 py-2 text-gray-600">{{ p.evaluations_count }}</td>
+          {% for m in model_names %}
+          <td class="px-4 py-2 text-gray-600">{{ p.per_model.get(m, 0) }}</td>
+          {% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="2" class="px-4 py-8 text-center text-gray-500">No data yet.</td></tr>
+        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No data yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -9,7 +9,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True)
     password_hash: str = Field()
-    role: str = Field()  # "doctor" | "technician" | "admin"
+    role: str = Field()  # "doctor" | "admin"
     full_name: Optional[str] = Field(default=None)
     email: Optional[str] = Field(default=None)
     institution: Optional[str] = Field(default=None)
@@ -20,7 +20,7 @@ class User(SQLModel, table=True):
 class Case(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
-    clinical_prompt: str
+    clinical_prompt: str = Field(default="")
     modality: str = "text+image"
 
     outputs: list["ModelOutput"] = Relationship(back_populates="case")
@@ -70,7 +70,7 @@ class EvaluationROI(SQLModel, table=True):
 class HelpRequest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     from_user_id: int = Field(foreign_key="users.id")
-    to_role: str = Field()  # e.g. "technician"
+    to_role: str = Field()  # e.g. "admin"
     subject: str
     question: str
     answer: Optional[str] = Field(default=None)
@@ -80,7 +80,7 @@ class HelpRequest(SQLModel, table=True):
 
 
 class RegisteredModel(SQLModel, table=True):
-    """Simple registry of models uploaded by technicians."""
+    """Simple registry of models (admin)."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str

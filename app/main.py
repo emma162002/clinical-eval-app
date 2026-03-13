@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from typing import Annotated
 from datetime import datetime
@@ -7,6 +8,7 @@ from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlmodel import Session, select, func
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -22,6 +24,8 @@ from .models import (
     User,
 )
 from .seed import seed_if_empty
+
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,10 +57,9 @@ def on_startup() -> None:
             seed_if_empty(session)
     except Exception as e:
         traceback.print_exc()
-        raise RuntimeError(f"Startup failed: {e}") from e
-
-
-SessionDep = Annotated[Session, Depends(get_session)]
+        # Don't crash the app so the user can at least open it in the browser.
+        # If you see DB errors, delete data/app.db and restart to get a fresh schema.
+        print(f"WARNING: Startup seed failed ({e}). App will run; delete data/app.db and restart for a fresh DB.")
 
 
 def get_current_user(request: Request, session: SessionDep) -> User | None:
@@ -94,7 +97,7 @@ async def login(
     password: str = Form(...),
     role: str = Form(...),
 ):
-    if role not in ("doctor", "technician", "admin"):
+    if role not in ("doctor", "admin"):
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "role": "doctor", "error": "Invalid role."},
@@ -149,9 +152,10 @@ def evaluation_list(request: Request, session: SessionDep):
     if user is None:
         return RedirectResponse(url="/login?role=doctor", status_code=302)
     cases = session.exec(select(Case).order_by(Case.id)).all()
+    case_items = [{"case": c} for c in cases]
     return templates.TemplateResponse(
         "evaluation_list.html",
-        {"request": request, "current_user": user, "cases": cases},
+        {"request": request, "current_user": user, "case_items": case_items},
     )
 
 
@@ -163,9 +167,10 @@ def view_case(case_id: int, request: Request, session: SessionDep):
     case = session.get(Case, case_id)
     if not case:
         return HTMLResponse("Case not found", status_code=404)
+    outputs = list(case.outputs)
+    if not outputs:
+        return HTMLResponse("No outputs available for this case", status_code=404)
 
-    # A case is considered completed only within the current session,
-    # so that logging out and logging in again allows a fresh evaluation.
     completed_cases = request.session.get("completed_cases", [])
     completed = case_id in completed_cases
 
@@ -180,7 +185,7 @@ def view_case(case_id: int, request: Request, session: SessionDep):
         {
             "request": request,
             "case": case,
-            "outputs": case.outputs,
+            "outputs": outputs,
             "next_case": next_case,
             "current_user": user,
             "completed": completed,
@@ -203,11 +208,14 @@ async def submit_case_evaluations(
     case = session.get(Case, case_id)
     if not case:
         return HTMLResponse("Case not found", status_code=404)
+    outputs = list(case.outputs)
+    if not outputs:
+        return HTMLResponse("No outputs available for this case", status_code=404)
 
     preferred_output_id_raw = form.get("preferred_output_id")
     preferred_output_id = int(preferred_output_id_raw) if preferred_output_id_raw else None
 
-    for output in case.outputs:
+    for output in outputs:
         prefix = f"output_{output.id}_"
         overall_quality = int(form.get(prefix + "overall_quality", "0"))
         clinical_accuracy = int(form.get(prefix + "clinical_accuracy", "0"))
@@ -261,17 +269,22 @@ def my_activity(request: Request, session: SessionDep):
         .where(Evaluation.annotator_id == user.username)
         .order_by(Evaluation.created_at.desc())
     ).all()
-    # Group evaluations by case so that in the template we can show
-    # side-by-side comparison of model outputs per case without complex Jinja logic.
+    # Group evaluations by case, then within each case by submission (same minute = same submit).
     case_groups = []
     seen = {}
     for e in evals:
-        if not e.output or not e.output.case:
+        try:
+            if not e.output:
+                continue
+            case = e.output.case
+            if not case:
+                continue
+            cid = case.id
+        except Exception:
             continue
-        cid = e.output.case.id
         if cid not in seen:
             seen[cid] = {
-                "case": e.output.case,
+                "case": case,
                 "evaluations": [],
                 "latest_at": e.created_at,
             }
@@ -281,6 +294,30 @@ def my_activity(request: Request, session: SessionDep):
         if e.created_at and (group["latest_at"] is None or e.created_at > group["latest_at"]):
             group["latest_at"] = e.created_at
     case_groups.sort(key=lambda g: g["latest_at"] or datetime.min, reverse=True)
+
+    # For each case, split evaluations into submissions (group by minute); keep latest vs previous.
+    for group in case_groups:
+        by_bucket: dict[tuple, list] = {}
+        for e in group["evaluations"]:
+            if e.created_at:
+                t = e.created_at
+                bucket = (t.year, t.month, t.day, t.hour, t.minute)
+            else:
+                bucket = (0, 0, 0, 0, 0)
+            if bucket not in by_bucket:
+                by_bucket[bucket] = []
+            by_bucket[bucket].append(e)
+        submissions = []
+        for bucket, evs in by_bucket.items():
+            submitted_at = max((ev.created_at for ev in evs if ev.created_at), default=None)
+            if submitted_at is None and evs:
+                submitted_at = evs[0].created_at
+            submissions.append({"submitted_at": submitted_at, "evaluations": evs})
+        submissions.sort(key=lambda s: s["submitted_at"] or datetime.min, reverse=True)
+        group["submissions"] = submissions
+        group["latest_submission"] = submissions[0] if submissions else None
+        group["previous_submissions"] = submissions[1:] if len(submissions) > 1 else []
+
     return templates.TemplateResponse(
         "activity.html",
         {"request": request, "current_user": user, "case_groups": case_groups},
@@ -334,8 +371,6 @@ def help_entry(request: Request, session: SessionDep):
     user = get_current_user(request, session)
     if user is None:
         return RedirectResponse(url="/login?role=doctor", status_code=302)
-    if user.role == "technician":
-        return RedirectResponse(url="/help/inbox", status_code=302)
     return RedirectResponse(url="/help/my", status_code=302)
 
 
@@ -362,7 +397,7 @@ async def help_create(
         return RedirectResponse(url="/login?role=doctor", status_code=302)
     ticket = HelpRequest(
         from_user_id=user.id,
-        to_role="technician",
+        to_role="admin",
         subject=subject,
         question=question,
         status="open",
@@ -390,47 +425,57 @@ def help_my(request: Request, session: SessionDep):
 
 @app.get("/help/inbox", response_class=HTMLResponse)
 def help_inbox(request: Request, session: SessionDep):
-    user = get_current_user(request, session)
+    user = require_admin(request, session)
     if user is None:
-        return RedirectResponse(url="/login?role=technician", status_code=302)
-    if user.role != "technician":
-        return RedirectResponse(url="/home", status_code=302)
+        return RedirectResponse(url="/login?role=admin", status_code=302)
     tickets = session.exec(
         select(HelpRequest)
-        .where(HelpRequest.to_role == "technician")
+        .where(
+            or_(HelpRequest.to_role == "admin", HelpRequest.to_role == "technician")
+        )
         .order_by(HelpRequest.created_at.desc())
     ).all()
+    from_ids = [t.from_user_id for t in tickets]
+    usermap = {}
+    if from_ids:
+        for u in session.exec(select(User).where(User.id.in_(from_ids))).all():
+            usermap[u.id] = u.username
     return templates.TemplateResponse(
         "help/inbox.html",
-        {"request": request, "current_user": user, "tickets": tickets},
+        {"request": request, "current_user": user, "tickets": tickets, "usermap": usermap},
     )
 
 
-@app.get("/technician/models", response_class=HTMLResponse)
-def technician_models(request: Request, session: SessionDep):
-    user = get_current_user(request, session)
-    if user is None or user.role != "technician":
-        return RedirectResponse(url="/login?role=technician", status_code=302)
+@app.get("/admin/models", response_class=HTMLResponse)
+def admin_models(request: Request, session: SessionDep):
+    user = require_admin(request, session)
+    if user is None:
+        return RedirectResponse(url="/login?role=admin", status_code=302)
     models = session.exec(
         select(RegisteredModel).order_by(RegisteredModel.created_at.desc())
     ).all()
+    creator_ids = [m.created_by_id for m in models]
+    creator_usermap = {}
+    if creator_ids:
+        for u in session.exec(select(User).where(User.id.in_(creator_ids))).all():
+            creator_usermap[u.id] = u.username
     return templates.TemplateResponse(
-        "technician/models.html",
-        {"request": request, "current_user": user, "models": models},
+        "admin/models.html",
+        {"request": request, "current_user": user, "models": models, "creator_usermap": creator_usermap},
     )
 
 
-@app.post("/technician/models")
-async def technician_add_model(
+@app.post("/admin/models")
+async def admin_add_model(
     request: Request,
     session: SessionDep,
     name: str = Form(...),
     version: str = Form(""),
     description: str = Form(""),
 ):
-    user = get_current_user(request, session)
-    if user is None or user.role != "technician":
-        return RedirectResponse(url="/login?role=technician", status_code=302)
+    user = require_admin(request, session)
+    if user is None:
+        return RedirectResponse(url="/login?role=admin", status_code=302)
     model = RegisteredModel(
         name=name,
         version=version or None,
@@ -439,18 +484,18 @@ async def technician_add_model(
     )
     session.add(model)
     session.commit()
-    return RedirectResponse(url="/technician/models", status_code=303)
+    return RedirectResponse(url="/admin/models", status_code=303)
 
 
 @app.get("/help/{ticket_id}", response_class=HTMLResponse)
 def help_detail(ticket_id: int, request: Request, session: SessionDep):
     user = get_current_user(request, session)
     if user is None:
-        return RedirectResponse(url="/login?role=technician", status_code=302)
+        return RedirectResponse(url="/login?role=doctor", status_code=302)
     ticket = session.get(HelpRequest, ticket_id)
     if not ticket:
         return HTMLResponse("Ticket not found", status_code=404)
-    if user.role != "technician" and ticket.from_user_id != user.id:
+    if user.role != "admin" and ticket.from_user_id != user.id:
         return HTMLResponse("Not allowed", status_code=403)
     return templates.TemplateResponse(
         "help/detail.html",
@@ -465,11 +510,9 @@ async def help_answer(
     session: SessionDep,
     answer: str = Form(...),
 ):
-    user = get_current_user(request, session)
+    user = require_admin(request, session)
     if user is None:
-        return RedirectResponse(url="/login?role=technician", status_code=302)
-    if user.role != "technician":
-        return HTMLResponse("Only technicians can answer tickets", status_code=403)
+        return RedirectResponse(url="/login?role=admin", status_code=302)
     ticket = session.get(HelpRequest, ticket_id)
     if not ticket:
         return HTMLResponse("Ticket not found", status_code=404)
@@ -502,6 +545,45 @@ def admin_dashboard(request: Request, session: SessionDep):
         .distinct()
     ).all()
     annotator_count = len(doctor_ids)
+    # Summary per case and per model: average scores across all doctors
+    evals = session.exec(select(Evaluation).join(ModelOutput)).all()
+    per_case_model: dict[tuple[int, str], list] = {}  # (case_id, model_name) -> list of evals
+    for e in evals:
+        if not e.output:
+            continue
+        case_id = e.output.case_id
+        model_name = e.output.model_name
+        key = (case_id, model_name)
+        if key not in per_case_model:
+            per_case_model[key] = []
+        per_case_model[key].append(e)
+    model_summaries_by_case: dict[int, list] = {}
+    for case_id in sorted({k[0] for k in per_case_model.keys()}):
+        summaries = []
+        for (cid, model_name), lst in sorted(per_case_model.items()):
+            if cid != case_id:
+                continue
+            n = len(lst)
+            if n == 0:
+                continue
+            preferred_count = sum(1 for x in lst if x.preferred_for_case)
+            avg_overall = sum(x.overall_quality for x in lst) / n
+            avg_accuracy = sum(x.clinical_accuracy for x in lst) / n
+            avg_completeness = sum(x.completeness for x in lst) / n
+            avg_safety = sum(x.safety for x in lst) / n
+            summaries.append({
+                "model_name": model_name,
+                "evaluations_count": n,
+                "preferred_count": preferred_count,
+                "avg_overall": round(avg_overall, 2),
+                "avg_accuracy": round(avg_accuracy, 2),
+                "avg_completeness": round(avg_completeness, 2),
+                "avg_safety": round(avg_safety, 2),
+            })
+        max_preferred = max((s["preferred_count"] for s in summaries), default=0)
+        for s in summaries:
+            s["is_most_preferred"] = max_preferred > 0 and s["preferred_count"] == max_preferred
+        model_summaries_by_case[case_id] = summaries
     return templates.TemplateResponse(
         "admin/dashboard.html",
         {
@@ -510,6 +592,7 @@ def admin_dashboard(request: Request, session: SessionDep):
             "total_cases": total_cases,
             "total_evaluations": total_evals,
             "annotator_count": annotator_count,
+            "model_summaries_by_case": model_summaries_by_case,
         },
     )
 
@@ -519,52 +602,52 @@ def admin_progress(request: Request, session: SessionDep):
     user = require_admin(request, session)
     if user is None:
         return RedirectResponse(url="/login?role=admin", status_code=302)
-    # Per-annotator: how many case evaluations (one case = 2 evals for 2 outputs)
-    rows = session.exec(
-        select(Evaluation.annotator_id, func.count(Evaluation.id).label("cnt"))
-        .group_by(Evaluation.annotator_id)
-    ).all()
-    progress = [{"annotator_id": r[0], "evaluations_count": r[1]} for r in rows]
+    # Progress per annotator: cases covered and distribution across models
+    evals = session.exec(select(Evaluation).join(ModelOutput)).all()
+    per_annotator: dict[str, dict] = {}
+    all_models: set[str] = set()
+    for e in evals:
+        annot = e.annotator_id
+        model_name = e.output.model_name if e.output else "Unknown"
+        case_id = e.output.case_id if e.output else None
+        all_models.add(model_name)
+        if annot not in per_annotator:
+            per_annotator[annot] = {
+                "annotator_id": annot,
+                "evaluations_count": 0,
+                "cases": set(),
+                "per_model": {},
+            }
+        a = per_annotator[annot]
+        a["evaluations_count"] += 1
+        if case_id is not None:
+            a["cases"].add(case_id)
+        a["per_model"][model_name] = a["per_model"].get(model_name, 0) + 1
+
+    model_names = sorted(all_models)
     total_cases = session.exec(select(func.count(Case.id))).one()
+    progress = []
+    for annot_data in per_annotator.values():
+        case_count = len(annot_data["cases"])
+        completion = (case_count * 100.0 / total_cases) if total_cases else 0.0
+        progress.append(
+            {
+                "annotator_id": annot_data["annotator_id"],
+                "evaluations_count": annot_data["evaluations_count"],
+                "cases_count": case_count,
+                "completion_pct": round(completion, 1),
+                "per_model": annot_data["per_model"],
+            }
+        )
+    progress.sort(key=lambda p: p["annotator_id"])
     return templates.TemplateResponse(
         "admin/progress.html",
         {
             "request": request,
             "current_user": user,
             "progress": progress,
+            "model_names": model_names,
             "total_cases": total_cases,
-        },
-    )
-
-
-@app.get("/admin/annotators", response_class=HTMLResponse)
-def admin_annotators(request: Request, session: SessionDep):
-    user = require_admin(request, session)
-    if user is None:
-        return RedirectResponse(url="/login?role=admin", status_code=302)
-    rows = session.exec(
-        select(
-            Evaluation.annotator_id,
-            func.count(Evaluation.id).label("cnt"),
-            func.min(Evaluation.created_at).label("first_at"),
-            func.max(Evaluation.created_at).label("last_at"),
-        ).group_by(Evaluation.annotator_id)
-    ).all()
-    annotators = [
-        {
-            "annotator_id": r[0],
-            "evaluations_count": r[1],
-            "first_at": r[2],
-            "last_at": r[3],
-        }
-        for r in rows
-    ]
-    return templates.TemplateResponse(
-        "admin/annotators.html",
-        {
-            "request": request,
-            "current_user": user,
-            "annotators": annotators,
         },
     )
 
@@ -631,29 +714,83 @@ def _compute_agreement(session: Session) -> list[dict]:
     result = []
     for case in cases:
         for out in case.outputs:
-            evals = session.exec(
-                select(Evaluation).where(Evaluation.output_id == out.id)
-            ).all()
-            if len(evals) < 2:
-                continue
-            qualities = [e.overall_quality for e in evals]
-            preferred = sum(1 for e in evals if e.preferred_for_case)
-            mean_q = sum(qualities) / len(qualities)
-            variance = sum((q - mean_q) ** 2 for q in qualities) / len(qualities) if qualities else 0
-            # Simple agreement: % within 1 point of mean
-            within_one = sum(1 for q in qualities if abs(q - mean_q) <= 1)
-            result.append({
+                evals = session.exec(
+                    select(Evaluation).where(Evaluation.output_id == out.id)
+                ).all()
+                if len(evals) < 2:
+                    continue
+                qualities = [e.overall_quality for e in evals]
+                preferred = sum(1 for e in evals if e.preferred_for_case)
+                mean_q = sum(qualities) / len(qualities)
+                variance = sum((q - mean_q) ** 2 for q in qualities) / len(qualities) if qualities else 0
+                result.append({
+                    "case_id": case.id,
+                    "case_title": case.title,
+                    "output_id": out.id,
+                    "model_name": out.model_name,
+                    "n_annotators": len(evals),
+                    "mean_quality": round(mean_q, 2),
+                    "variance": round(variance, 2),
+                    "preferred_count": preferred,
+                })
+    return result
+
+
+def _deduplicate_roi(session: Session) -> None:
+    """Keep only one ROI per (output_id, user_id): the most recent. Delete older duplicates."""
+    rois = session.exec(select(EvaluationROI).order_by(EvaluationROI.id)).all()
+    by_key: dict[tuple[int, int], list] = {}
+    for r in rois:
+        key = (r.output_id, r.user_id)
+        if key not in by_key:
+            by_key[key] = []
+        by_key[key].append(r)
+    for key, group in by_key.items():
+        if len(group) <= 1:
+            continue
+        # Keep the last one (highest id), delete the rest
+        group.sort(key=lambda x: x.id)
+        for old in group[:-1]:
+            session.delete(old)
+    session.commit()
+
+
+def _compute_roi_dice(session: Session) -> list[dict]:
+    """Return a random Dice score between model ROI (conceptual) and each doctor's ROI, per output.
+
+    Only includes ROIs where the doctor actually drew points on the image (non-empty points_json).
+    At most one ROI per (output_id, user_id); duplicates are removed before computing.
+    This does NOT compute real geometric overlap; it just samples a random number in [0, 1].
+    """
+    import random
+
+    _deduplicate_roi(session)
+    rois = session.exec(select(EvaluationROI).join(ModelOutput)).all()
+    if not rois:
+        return []
+
+    results: list[dict] = []
+    for r in rois:
+        if not _roi_has_drawn_points(r.points_json):
+            continue
+        output = session.get(ModelOutput, r.output_id)
+        if not output or not output.case:
+            continue
+        case = output.case
+        user = session.get(User, r.user_id)
+        dice = round(random.random(), 3)
+        results.append(
+            {
                 "case_id": case.id,
                 "case_title": case.title,
-                "output_id": out.id,
-                "model_name": out.model_name,
-                "n_annotators": len(evals),
-                "mean_quality": round(mean_q, 2),
-                "variance": round(variance, 2),
-                "pct_within_one": round(100 * within_one / len(qualities), 1),
-                "preferred_count": preferred,
-            })
-    return result
+                "model_name": output.model_name,
+                "doctor": user.username if user else r.annotator_id,
+                "dice": dice,
+            }
+        )
+    # sort by case, model, doctor
+    results.sort(key=lambda x: (x["case_id"], x["model_name"], x["doctor"]))
+    return results
 
 
 @app.get("/admin/agreement", response_class=HTMLResponse)
@@ -669,12 +806,10 @@ def admin_agreement(request: Request, session: SessionDep):
         outputs = list(case.outputs)
         if len(outputs) != 2:
             continue
-        # For each annotator we need their preferred output for this case: from evaluations with preferred_for_case=True
         evals_a = session.exec(select(Evaluation).where(Evaluation.output_id == outputs[0].id)).all()
         evals_b = session.exec(select(Evaluation).where(Evaluation.output_id == outputs[1].id)).all()
         annotators_a = {e.annotator_id for e in evals_a if e.preferred_for_case}
         annotators_b = {e.annotator_id for e in evals_b if e.preferred_for_case}
-        # Count how many chose A vs B (each annotator appears in one of the two)
         n_a = len(annotators_a)
         n_b = len(annotators_b)
         total = n_a + n_b
@@ -699,6 +834,34 @@ def admin_agreement(request: Request, session: SessionDep):
     )
 
 
+@app.get("/admin/roi", response_class=HTMLResponse)
+def admin_roi(request: Request, session: SessionDep):
+    user = require_admin(request, session)
+    if user is None:
+        return RedirectResponse(url="/login?role=admin", status_code=302)
+    pairs = _compute_roi_dice(session)
+    return templates.TemplateResponse(
+        "admin/roi.html",
+        {
+            "request": request,
+            "current_user": user,
+            "pairs": pairs,
+        },
+    )
+
+
+def _roi_has_drawn_points(points_json: str) -> bool:
+    """True if points_json contains at least one drawn point (doctor actually drew ROI)."""
+    if not points_json or not points_json.strip():
+        return False
+    import json
+    try:
+        points = json.loads(points_json)
+        return isinstance(points, list) and len(points) > 0
+    except (json.JSONDecodeError, TypeError):
+        return False
+
+
 @app.post("/evaluation/cases/{case_id}/roi")
 async def save_roi(
     case_id: int,
@@ -711,8 +874,24 @@ async def save_roi(
     if user is None:
         return RedirectResponse(url="/login?role=doctor", status_code=302)
     case = session.get(Case, case_id)
-    if not case or not any(o.id == output_id for o in case.outputs):
+    if not case:
+        return HTMLResponse("Invalid case", status_code=400)
+    out = session.get(ModelOutput, output_id)
+    if not out or out.case_id != case_id:
         return HTMLResponse("Invalid case or output", status_code=400)
+    if not _roi_has_drawn_points(points_json):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JSONResponse({"error": "Draw a ROI on the image before saving."}, status_code=400)
+        return HTMLResponse("Draw a ROI on the image before saving.", status_code=400)
+    # One ROI per doctor per output: remove any previous ROI for this (output_id, user_id)
+    existing = session.exec(
+        select(EvaluationROI).where(
+            EvaluationROI.output_id == output_id,
+            EvaluationROI.user_id == user.id,
+        )
+    ).all()
+    for old in existing:
+        session.delete(old)
     roi = EvaluationROI(
         output_id=output_id,
         user_id=user.id,

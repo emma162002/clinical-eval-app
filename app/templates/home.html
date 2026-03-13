@@ -3,35 +3,89 @@
 {% block header_title %}Home{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <div class="bg-white rounded-lg shadow p-6 border border-gray-100">
-    <h3 class="text-lg font-semibold text-gray-900 mb-2">Welcome, {{ current_user.username }}</h3>
-    <p class="text-sm text-gray-600 mb-4">
-      This application is for structured evaluation of multimodal oncology models
-      (radiology images + draft reports). As a clinician you will:
-      <br />
-      <span class="font-medium">1)</span> read the clinical prompt and model outputs,
-      <span class="font-medium">2)</span> score quality, accuracy, completeness and safety,
-      <span class="font-medium">3)</span> choose which report you would sign,
-      <span class="font-medium">4)</span> optionally mark a region of interest (ROI) on the image
-      and leave free-text feedback.
+<div class="max-w-4xl mx-auto space-y-8">
+  <!-- Welcome hero -->
+  <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-8 text-white">
+    <h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-2">Welcome, {{ current_user.username }}</h1>
+    <p class="text-lg text-blue-100">
+      Evaluate multimodal oncology models: review images and draft reports, then rate and compare outputs.
     </p>
-    <div class="grid grid-cols-2 gap-4 max-w-md">
-      <div class="bg-blue-50 rounded-lg p-4">
-        <p class="text-2xl font-bold text-blue-700">{{ user_evaluations_count }}</p>
-        <p class="text-sm text-blue-900">Submitted evaluations</p>
+  </div>
+
+  <!-- How it works – large steps with colored icons -->
+  <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+    <h2 class="text-xl font-bold text-gray-900 mb-2">How it works</h2>
+    <p class="text-gray-600 mb-6">As a clinician you will:</p>
+    <ul class="space-y-5">
+      <li class="flex items-start gap-4">
+        <span class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shadow-sm" aria-hidden="true">
+          <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </span>
+        <div>
+          <span class="text-lg font-semibold text-gray-900">Read</span>
+          <span class="text-base text-gray-700"> the clinical prompt and model outputs for each case.</span>
+        </div>
+      </li>
+      <li class="flex items-start gap-4">
+        <span class="flex-shrink-0 w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shadow-sm" aria-hidden="true">
+          <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        </span>
+        <div>
+          <span class="text-lg font-semibold text-gray-900">Score</span>
+          <span class="text-base text-gray-700"> quality, accuracy, completeness and safety (1–5) for each output.</span>
+        </div>
+      </li>
+      <li class="flex items-start gap-4">
+        <span class="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shadow-sm" aria-hidden="true">
+          <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </span>
+        <div>
+          <span class="text-lg font-semibold text-gray-900">Choose</span>
+          <span class="text-base text-gray-700"> which report you would prefer to sign for that case.</span>
+        </div>
+      </li>
+      <li class="flex items-start gap-4">
+        <span class="flex-shrink-0 w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shadow-sm" aria-hidden="true">
+          <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+        </span>
+        <div>
+          <span class="text-lg font-semibold text-gray-900">Optional:</span>
+          <span class="text-base text-gray-700"> mark a region of interest (ROI) on the image and add free-text comments.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Stats cards with icons -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 flex items-center gap-4">
+      <span class="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center" aria-hidden="true">
+        <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </span>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">{{ user_evaluations_count }}</p>
+        <p class="text-base font-medium text-gray-600">Submitted evaluations</p>
       </div>
-      <div class="bg-slate-50 rounded-lg p-4">
-        <p class="text-2xl font-bold text-slate-700">{{ total_cases }}</p>
-        <p class="text-sm text-slate-900">Available cases</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 flex items-center gap-4">
+      <span class="flex-shrink-0 w-14 h-14 rounded-xl bg-indigo-100 flex items-center justify-center" aria-hidden="true">
+        <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      </span>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">{{ total_cases }}</p>
+        <p class="text-base font-medium text-gray-600">Available cases</p>
       </div>
     </div>
   </div>
-  <div class="flex flex-wrap gap-3">
-    <a href="{{ request.url_for('evaluation_list') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+
+  <!-- Primary actions -->
+  <div class="flex flex-wrap gap-4">
+    <a href="/evaluation" class="inline-flex items-center gap-2 px-6 py-3.5 bg-blue-600 text-white text-base font-semibold rounded-xl shadow-md hover:bg-blue-700 hover:shadow-lg transition-all">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       Go to case evaluation
     </a>
-    <a href="{{ request.url_for('my_activity') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50">
+    <a href="/activity" class="inline-flex items-center gap-2 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 text-base font-semibold rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all">
+      <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       My activity
     </a>
   </div>

@@ -46,12 +46,13 @@
 {% if not completed %}
 <form
   method="post"
-  action="{{ request.url_for('submit_case_evaluations', case_id=case.id) }}"
+  action="/evaluation/cases/{{ case.id }}/submit"
   class="space-y-6"
   onsubmit="return confirm('Are you sure you want to submit these ratings? You will not be able to change them afterwards.');"
 >
-  <div class="bg-white shadow rounded-lg p-5 border border-gray-100">
-    <label class="block text-sm font-medium text-gray-700 mb-1" for="annotator_id">
+  <div class="bg-blue-50/60 border-l-4 border-blue-500 rounded-lg shadow p-5 border border-blue-100">
+    <span class="text-xs font-semibold text-blue-700 uppercase tracking-wide">To complete</span>
+    <label class="block text-sm font-medium text-gray-800 mt-1 mb-1" for="annotator_id">
       Annotator ID (initials / site code)
     </label>
     <input
@@ -59,10 +60,56 @@
       id="annotator_id"
       name="annotator_id"
       value="{{ current_user.username if (current_user is defined and current_user) else '' }}"
-      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+      class="mt-1 block w-full rounded-md border-blue-300 bg-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
       placeholder="e.g. EB, R1, SiteA-01"
     />
   </div>
+
+  {% set case_image_url = outputs[0].image_url if outputs and outputs[0].image_url else (outputs[1].image_url if outputs|length > 1 else none) %}
+  {% if case_image_url %}
+  <div class="flex justify-center my-6">
+    <div class="w-full max-w-2xl">
+      <div class="text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide text-center">
+        Case image (shared)
+      </div>
+      <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-black mx-auto" id="case-img-wrap" style="max-width: 42rem;">
+        <img
+          id="case-img"
+          src="{{ case_image_url }}"
+          alt="Case image for {{ case.title }}"
+          class="w-full object-contain max-h-72 mx-auto block"
+          onerror="this.style.display='none'; this.parentElement.querySelector('.img-fallback').style.display='flex';"
+        />
+        {% for output in outputs %}
+        <canvas id="roi-canvas-{{ output.id }}" class="absolute inset-0 w-full h-full pointer-events-none hidden" style="max-height: 18rem;"></canvas>
+        {% endfor %}
+        <div class="img-fallback hidden flex items-center justify-center text-gray-200 text-xs h-48">
+          Image failed to load (offline-safe placeholder should appear after refresh).
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-gray-500 text-center">
+        Image is illustrative and may represent a single key slice / sequence.
+      </p>
+      <div class="mt-2 flex flex-wrap justify-center gap-4">
+        <span class="text-xs text-gray-500 self-center">Optional: </span>
+        {% for output in outputs %}
+        <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-md px-2 py-1">
+          <button type="button" class="roi-toggle text-xs font-medium text-blue-700 hover:text-blue-900" data-output-id="{{ output.id }}" data-model-name="{{ output.model_name }}">
+            Draw ROI for {{ output.model_name }}
+          </button>
+          <div class="roi-form hidden inline-flex items-center gap-2" id="roi-form-{{ output.id }}">
+            <input type="hidden" value="{{ output.id }}" id="roi-output-{{ output.id }}" />
+            <input type="hidden" id="roi-points-{{ output.id }}" value="[]" />
+            <button type="button" id="roi-save-{{ output.id }}" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
+              Save ROI
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     {% for output in outputs %}
@@ -71,7 +118,7 @@
         <h3 class="text-lg font-semibold text-gray-900">
           {{ output.model_name }}
         </h3>
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5">
           <input
             type="radio"
             id="preferred_{{ output.id }}"
@@ -79,47 +126,11 @@
             value="{{ output.id }}"
             class="h-4 w-4 text-blue-600 border-gray-300"
           />
-          <label for="preferred_{{ output.id }}" class="text-xs font-medium text-gray-700">
-            Preferred
+          <label for="preferred_{{ output.id }}" class="text-xs font-semibold text-amber-800">
+            ✓ Select as preferred
           </label>
         </div>
       </div>
-
-      {% if output.image_url %}
-      <div class="mb-3">
-        <div class="text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
-          Representative image
-        </div>
-        <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-black" id="img-wrap-{{ output.id }}">
-          <img
-            id="img-{{ output.id }}"
-            src="{{ output.image_url }}"
-            alt="Case image for {{ case.title }}"
-            class="w-full object-contain max-h-72 mx-auto block"
-            onerror="this.style.display='none'; this.parentElement.querySelector('.img-fallback').style.display='flex';"
-          />
-          <canvas id="roi-canvas-{{ output.id }}" class="absolute inset-0 w-full h-full pointer-events-none hidden" style="max-height: 18rem;"></canvas>
-          <div class="img-fallback hidden items-center justify-center text-gray-200 text-xs h-48">
-            Image failed to load (offline-safe placeholder should appear after refresh).
-          </div>
-        </div>
-        <p class="mt-1 text-xs text-gray-500">
-          Image is illustrative and may represent a single key slice / sequence.
-        </p>
-        <div class="mt-2">
-          <button type="button" class="roi-toggle text-xs text-blue-600 hover:text-blue-800" data-output-id="{{ output.id }}">
-            Draw region of interest (ROI)
-          </button>
-          <div class="roi-form hidden mt-2 inline-flex items-center gap-2" id="roi-form-{{ output.id }}">
-            <input type="hidden" value="{{ output.id }}" id="roi-output-{{ output.id }}" />
-            <input type="hidden" id="roi-points-{{ output.id }}" value="[]" />
-            <button type="button" id="roi-save-{{ output.id }}" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
-              Save ROI
-            </button>
-          </div>
-        </div>
-      </div>
-      {% endif %}
 
       <div class="mb-4">
         <div class="text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">
@@ -130,34 +141,37 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        {% for field_name, label in [
-          ('overall_quality', 'Overall quality'),
-          ('clinical_accuracy', 'Clinical accuracy'),
-          ('completeness', 'Completeness'),
-          ('safety', 'Safety / appropriateness')
-        ] %}
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
-            {{ label }} (1–5)
-          </label>
-          <select
-            name="output_{{ output.id }}_{{ field_name }}"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
-          >
-            <option value="0" selected>— Not filled</option>
-            <option value="1">1 – Unacceptable</option>
-            <option value="2">2 – Poor</option>
-            <option value="3">3 – Borderline</option>
-            <option value="4">4 – Good</option>
-            <option value="5">5 – Excellent</option>
-          </select>
+      <div class="bg-blue-50/50 border border-blue-200 rounded-lg p-4 mb-4">
+        <span class="text-xs font-semibold text-blue-700 uppercase tracking-wide">Your ratings</span>
+        <div class="grid grid-cols-2 gap-4 mt-2">
+          {% for field_name, label in [
+            ('overall_quality', 'Overall quality'),
+            ('clinical_accuracy', 'Clinical accuracy'),
+            ('completeness', 'Completeness'),
+            ('safety', 'Safety / appropriateness')
+          ] %}
+          <div>
+            <label class="block text-xs font-medium text-gray-800 mb-1">
+              {{ label }} (1–5)
+            </label>
+            <select
+              name="output_{{ output.id }}_{{ field_name }}"
+              class="mt-1 block w-full rounded-md border-blue-300 bg-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+            >
+              <option value="0" selected>— Not filled</option>
+              <option value="1">1 – Unacceptable</option>
+              <option value="2">2 – Poor</option>
+              <option value="3">3 – Borderline</option>
+              <option value="4">4 – Good</option>
+              <option value="5">5 – Excellent</option>
+            </select>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
 
-      <fieldset class="mb-3">
-        <legend class="text-xs font-medium text-gray-700 mb-2">
+      <fieldset class="mb-3 bg-blue-50/40 border border-blue-200 rounded-lg p-3">
+        <legend class="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">
           Error categories (check all that apply)
         </legend>
         <div class="space-y-1 text-xs text-gray-700">
@@ -183,7 +197,7 @@
               name="output_{{ output.id }}_formatting_issues"
               class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
             />
-            <span>Formatting / structure issues (hard to sign as-is)</span>
+            <span>Formatting / structure issues</span>
           </label>
           <label class="flex items-start space-x-2">
             <input
@@ -191,12 +205,12 @@
               name="output_{{ output.id }}_safety_concerns"
               class="mt-0.5 h-3 w-3 text-blue-600 border-gray-300 rounded"
             />
-            <span>Safety concern (would change urgent management if used)</span>
+            <span>Safety concern</span>
           </label>
         </div>
       </fieldset>
 
-      <div>
+      <div class="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
         <label class="block text-xs font-medium text-gray-700 mb-1" for="output_{{ output.id }}_free_text_feedback">
           Optional comments on this output
         </label>
@@ -204,7 +218,7 @@
           id="output_{{ output.id }}_free_text_feedback"
           name="output_{{ output.id }}_free_text_feedback"
           rows="3"
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
+          class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs"
           placeholder="E.g. good description but underestimates size; consider mentioning prior surgery; wording could be more concise."
         ></textarea>
       </div>
@@ -212,13 +226,13 @@
     {% endfor %}
   </div>
 
-  <div class="flex items-center justify-between pt-4 border-t border-gray-200">
-    <div class="text-xs text-gray-500">
-      You can submit even with partial input: all fields are optional. Submitting saves your answers and moves to the next case.
+  <div class="flex items-center justify-between pt-4 border-t-2 border-blue-200 bg-blue-50/50 rounded-lg p-4 -mx-1">
+    <div class="text-xs text-gray-600">
+      You can submit even with partial input; all fields are optional. Submitting saves your answers and moves to the next case.
     </div>
     <button
       type="submit"
-      class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
     >
       Save ratings{% if next_case %} &amp; go to next case{% else %} &amp; finish{% endif %}
     </button>
@@ -233,7 +247,7 @@
 {% endif %}
 
 <div class="mt-4 text-sm text-gray-500">
-  <a href="{{ request.url_for('evaluation_list') }}" class="text-blue-600 hover:text-blue-800">← Back to case list</a>
+  <a href="/evaluation" class="text-blue-600 hover:text-blue-800">← Back to case list</a>
 </div>
 
 <script>
@@ -241,11 +255,10 @@
   document.querySelectorAll('.roi-toggle').forEach(function(btn) {
     var outputId = btn.getAttribute('data-output-id');
     var canvas = document.getElementById('roi-canvas-' + outputId);
-    var img = document.getElementById('img-' + outputId);
     var form = document.getElementById('roi-form-' + outputId);
     var pointsInput = document.getElementById('roi-points-' + outputId);
     var saveBtn = document.getElementById('roi-save-' + outputId);
-    if (!canvas || !img || !form || !pointsInput || !saveBtn) return;
+    if (!canvas || !form || !pointsInput || !saveBtn) return;
     var wrap = canvas.parentElement;
     var drawing = false;
     var points = [];
@@ -279,7 +292,10 @@
     }
 
     btn.addEventListener('click', function() {
+      document.querySelectorAll('.roi-form').forEach(function(f) { f.classList.add('hidden'); });
+      document.querySelectorAll('[id^="roi-canvas-"]').forEach(function(c) { c.classList.add('hidden'); c.style.pointerEvents = 'none'; });
       canvas.classList.remove('hidden');
+      canvas.style.pointerEvents = 'auto';
       form.classList.remove('hidden');
       setCanvasSize();
     });
@@ -311,7 +327,7 @@
       var formData = new FormData();
       formData.append("output_id", outputId);
       formData.append("points_json", pointsInput.value);
-      fetch("{{ request.url_for('save_roi', case_id=case.id) }}", {
+      fetch("/evaluation/cases/{{ case.id }}/roi", {
         method: "POST",
         body: formData,
         headers: {

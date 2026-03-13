@@ -5,77 +5,102 @@
 {% block content %}
 <div class="space-y-4">
   <p class="text-sm text-gray-600">
-    Overview of your saved evaluations (grouped by case, most recent first).
+    Overview of your saved evaluations, grouped by case. For each case, the latest evaluation is shown first; previous evaluations follow.
   </p>
 
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Case</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Models compared</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {% if case_groups %}
-          {% for group in case_groups %}
-          <tr class="bg-gray-100">
-            <td colspan="2" class="px-4 py-2 text-xs font-semibold text-gray-700">
-              Case {{ group.case.id }} – {{ group.case.title }}
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 align-top text-xs text-gray-600 whitespace-nowrap">
-              Last evaluation: {{ group.latest_at.strftime('%Y-%m-%d %H:%M') if group.latest_at else '-' }}
-            </td>
-            <td class="px-4 py-3">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {% for ev in group.evaluations %}
-                <div class="border rounded-lg p-3 text-sm {{ 'ring-2 ring-green-400 border-green-300 bg-green-50' if ev.preferred_for_case else 'border-gray-200 bg-white' }}">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="font-semibold text-gray-900">{{ ev.output.model_name }}</span>
-                    {% if ev.preferred_for_case %}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500 text-white">
-                        Preferred
-                      </span>
-                    {% endif %}
-                  </div>
-                  <div class="text-xs text-gray-600 mb-1">
-                    {{ ev.created_at.strftime('%Y-%m-%d %H:%M') if ev.created_at else '-' }}
-                  </div>
-                  <div class="text-xs text-gray-800 space-y-0.5 mb-2">
-                    <div>Overall: {{ ev.overall_quality }}/5</div>
-                    <div>Accuracy: {{ ev.clinical_accuracy }}/5</div>
-                    <div>Completeness: {{ ev.completeness }}/5</div>
-                    <div>Safety: {{ ev.safety }}/5</div>
-                  </div>
-                  <div class="text-[11px] text-gray-700">
-                    {% set flags = [] %}
-                    {% if ev.hallucination %}{% set _ = flags.append('Hallucinated findings') %}{% endif %}
-                    {% if ev.missing_important_findings %}{% set _ = flags.append('Missing findings') %}{% endif %}
-                    {% if ev.formatting_issues %}{% set _ = flags.append('Formatting issues') %}{% endif %}
-                    {% if ev.safety_concerns %}{% set _ = flags.append('Safety concern') %}{% endif %}
-                    {% if flags %}
-                      <span class="font-semibold">Flags:</span> {{ flags|join(', ') }}
-                    {% else %}
-                      <span class="text-gray-400">No error flags</span>
-                    {% endif %}
-                  </div>
-                </div>
-                {% endfor %}
-              </div>
-            </td>
-          </tr>
+  {% if case_groups %}
+    {% for group in case_groups %}
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+      <div class="px-4 py-3 bg-gray-100 border-b border-gray-200">
+        <h3 class="text-sm font-semibold text-gray-800">
+          Case {{ group.case.id }} – {{ group.case.title }}
+        </h3>
+      </div>
+
+      {% if group.latest_submission %}
+      <div class="p-4 border-b border-gray-200">
+        <p class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
+          Latest evaluation — {{ group.latest_submission.submitted_at.strftime('%Y-%m-%d %H:%M') if group.latest_submission.submitted_at else '-' }}
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {% for ev in group.latest_submission.evaluations %}
+          <div class="border rounded-lg p-3 text-sm {{ 'ring-2 ring-green-400 border-green-300 bg-green-50' if ev.preferred_for_case else 'border-gray-200 bg-white' }}">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold text-gray-900">{{ ev.output.model_name }}</span>
+              {% if ev.preferred_for_case %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500 text-white">Preferred</span>
+              {% endif %}
+            </div>
+            <div class="text-xs text-gray-600 mb-1">{{ ev.created_at.strftime('%Y-%m-%d %H:%M') if ev.created_at else '-' }}</div>
+            <div class="text-xs text-gray-800 space-y-0.5 mb-2">
+              <div>Overall: {{ ev.overall_quality }}/5</div>
+              <div>Accuracy: {{ ev.clinical_accuracy }}/5</div>
+              <div>Completeness: {{ ev.completeness }}/5</div>
+              <div>Safety: {{ ev.safety }}/5</div>
+            </div>
+            <div class="text-[11px] text-gray-700">
+              {% set flags = [] %}
+              {% if ev.hallucination %}{% set _ = flags.append('Hallucinated findings') %}{% endif %}
+              {% if ev.missing_important_findings %}{% set _ = flags.append('Missing findings') %}{% endif %}
+              {% if ev.formatting_issues %}{% set _ = flags.append('Formatting issues') %}{% endif %}
+              {% if ev.safety_concerns %}{% set _ = flags.append('Safety concern') %}{% endif %}
+              {% if flags %}<span class="font-semibold">Flags:</span> {{ flags|join(', ') }}{% else %}<span class="text-gray-400">No error flags</span>{% endif %}
+            </div>
+          </div>
           {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="2" class="px-4 py-8 text-center text-gray-500">
-              No evaluations yet. Once you submit ratings for a case, they will appear here.
-            </td>
-          </tr>
-        {% endif %}
-      </tbody>
-    </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if group.previous_submissions %}
+      <div class="p-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Previous evaluations</p>
+        <div class="space-y-4">
+          {% for sub in group.previous_submissions %}
+          <div class="pl-2 border-l-2 border-gray-200">
+            <p class="text-xs text-gray-500 mb-2">{{ sub.submitted_at.strftime('%Y-%m-%d %H:%M') if sub.submitted_at else '-' }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {% for ev in sub.evaluations %}
+              <div class="border rounded-lg p-3 text-sm {{ 'ring-2 ring-green-400 border-green-300 bg-green-50' if ev.preferred_for_case else 'border-gray-200 bg-white' }}">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="font-semibold text-gray-900">{{ ev.output.model_name }}</span>
+                  {% if ev.preferred_for_case %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500 text-white">Preferred</span>
+                  {% endif %}
+                </div>
+                <div class="text-xs text-gray-600 mb-1">{{ ev.created_at.strftime('%Y-%m-%d %H:%M') if ev.created_at else '-' }}</div>
+                <div class="text-xs text-gray-800 space-y-0.5 mb-2">
+                  <div>Overall: {{ ev.overall_quality }}/5</div>
+                  <div>Accuracy: {{ ev.clinical_accuracy }}/5</div>
+                  <div>Completeness: {{ ev.completeness }}/5</div>
+                  <div>Safety: {{ ev.safety }}/5</div>
+                </div>
+                <div class="text-[11px] text-gray-700">
+                  {% set flags = [] %}
+                  {% if ev.hallucination %}{% set _ = flags.append('Hallucinated findings') %}{% endif %}
+                  {% if ev.missing_important_findings %}{% set _ = flags.append('Missing findings') %}{% endif %}
+                  {% if ev.formatting_issues %}{% set _ = flags.append('Formatting issues') %}{% endif %}
+                  {% if ev.safety_concerns %}{% set _ = flags.append('Safety concern') %}{% endif %}
+                  {% if flags %}<span class="font-semibold">Flags:</span> {{ flags|join(', ') }}{% else %}<span class="text-gray-400">No error flags</span>{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not group.latest_submission and not group.previous_submissions %}
+      <div class="p-4 text-sm text-gray-500">No evaluations for this case.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+    No evaluations yet. Once you submit ratings for a case, they will appear here.
   </div>
+  {% endif %}
 </div>
 {% endblock %}

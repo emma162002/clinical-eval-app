@@ -64,39 +64,15 @@ SAMPLE_CASES = [
 
 
 def seed_if_empty(session: Session) -> None:
-    # Seed default users (doctors, technician and admin) if none exist
     if session.exec(select(User)).first() is None:
-        # Three doctor accounts
-        session.add(
-            User(
-                username="doctor1",
-                password_hash=hash_password("doctor123"),
-                role="doctor",
+        for username in ["doctor1", "doctor2", "doctor3"]:
+            session.add(
+                User(
+                    username=username,
+                    password_hash=hash_password("doctor123"),
+                    role="doctor",
+                )
             )
-        )
-        session.add(
-            User(
-                username="doctor2",
-                password_hash=hash_password("doctor123"),
-                role="doctor",
-            )
-        )
-        session.add(
-            User(
-                username="doctor3",
-                password_hash=hash_password("doctor123"),
-                role="doctor",
-            )
-        )
-        # One technician account
-        session.add(
-            User(
-                username="technician",
-                password_hash=hash_password("technician123"),
-                role="technician",
-            )
-        )
-        # One admin account
         session.add(
             User(
                 username="admin",
@@ -106,8 +82,7 @@ def seed_if_empty(session: Session) -> None:
         )
         session.flush()
 
-    existing = session.exec(select(Case)).first()
-    if existing:
+    if session.exec(select(Case)).first() is not None:
         return
 
     for case_data in SAMPLE_CASES:
@@ -128,4 +103,3 @@ def seed_if_empty(session: Session) -> None:
                 )
             )
     session.commit()
-

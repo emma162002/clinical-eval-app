@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Model management – Technician{% endblock %}
+{% block title %}Model management – Admin{% endblock %}
 {% block header_title %}Model management{% endblock %}
 
 {% block content %}
@@ -10,7 +10,7 @@
 
   <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm max-w-xl">
     <h2 class="text-base font-semibold text-gray-900 mb-3">Add a new model</h2>
-    <form method="post" action="{{ request.url_for('technician_add_model') }}" class="space-y-4">
+    <form method="post" action="{{ request.url_for('admin_add_model') }}" class="space-y-4">
       <div>
         <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Model name</label>
         <input
@@ -74,7 +74,7 @@
             {{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '-' }}
           </td>
           <td class="px-4 py-2 text-sm text-gray-700">
-            {{ current_user.username }}
+            {{ creator_usermap.get(m.created_by_id, '-') }}
           </td>
           <td class="px-4 py-2 text-sm text-gray-700">
             {{ m.description or '–' }}
@@ -92,4 +92,3 @@
   </div>
 </div>
 {% endblock %}
-

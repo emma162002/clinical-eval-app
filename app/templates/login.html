@@ -5,7 +5,7 @@
 {% block content %}
 <div class="max-w-md mx-auto bg-white shadow rounded-lg p-8 border border-gray-100">
   <h2 class="text-xl font-semibold text-gray-900 mb-1 text-center">
-    Sign in as {{ 'Doctor' if role == 'doctor' else ('Technician' if role == 'technician' else 'Admin') }}
+    Sign in as {{ 'Doctor' if role == 'doctor' else 'Admin' }}
   </h2>
   <p class="text-sm text-gray-500 mb-6 text-center">
     Enter your username and password.
@@ -62,7 +62,7 @@
   </p>
 
   <p class="mt-6 text-xs text-gray-400 text-center">
-    Demo accounts: doctor / doctor123 · technician / technician123 · admin / admin123
+    Demo accounts: doctor1–3 / doctor123 · admin / admin123
   </p>
 </div>
 {% endblock %}

@@ -24,7 +24,7 @@
             {{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '-' }}
           </td>
           <td class="px-4 py-2 text-sm text-gray-700">
-            {{ t.from_user_id }}
+            {{ usermap.get(t.from_user_id, t.from_user_id) }}
           </td>
           <td class="px-4 py-2 text-sm">
             <a href="{{ request.url_for('help_detail', ticket_id=t.id) }}" class="text-blue-600 hover:text-blue-800">
