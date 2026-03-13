@@ -88,11 +88,3 @@ Then open: **http://127.0.0.1:8000**
    `docker-compose down && docker-compose up -d --build`  
    Then check that the container is running:  
    `docker-compose ps`
-
-## Screenshot
-
-You can add a screenshot (e.g. of the case evaluation or dashboard) by placing an image in the repo (e.g. `docs/screenshot.png`) and adding:
-
-```markdown
-![App screenshot](docs/screenshot.png)
-```
