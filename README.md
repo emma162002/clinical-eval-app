@@ -48,10 +48,11 @@ So after `docker-compose up --build`, open http://localhost:8000 and log in with
 
 ## Running the app
 
-**With Docker:**
+The app is containerized with Docker Compose. Run `docker compose up` (or `docker-compose up --build`) and open **http://localhost:8000** to see a working interface with sample data immediately.
+
 ```bash
 # Replace with the folder where you cloned or extracted the repo (e.g. cd ~/Downloads/clinical-eval-app)
 cd /path/to/clinical-eval-app
-docker-compose up --build
+docker compose up --build
 ```
 Then open in your browser: **http://localhost:8000**
