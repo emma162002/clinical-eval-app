@@ -674,6 +674,36 @@ def admin_dashboard(request: Request, session: SessionDep):
         for s in summaries:
             s["is_most_preferred"] = max_preferred > 0 and s["preferred_count"] == max_preferred
         model_summaries_by_case[case_id] = summaries
+
+    # Global preference totals per model (aggregated across all cases)
+    model_totals: dict[str, dict] = {}
+    for lst in per_case_model.values():
+        for e in lst:
+            mn = e.output.model_name if e.output else None
+            if not mn:
+                continue
+            if mn not in model_totals:
+                model_totals[mn] = {"preferred": 0, "evaluations": 0}
+            model_totals[mn]["preferred"] += 1 if e.preferred_for_case else 0
+            model_totals[mn]["evaluations"] += 1
+
+    def _track(names: list[str]) -> list[dict]:
+        rows = []
+        total_pref = sum(model_totals.get(n, {}).get("preferred", 0) for n in names)
+        for n in names:
+            t = model_totals.get(n, {"preferred": 0, "evaluations": 0})
+            win_pct = round(t["preferred"] * 100 / total_pref) if total_pref else None
+            rows.append({
+                "model_name": n,
+                "preferred": t["preferred"],
+                "evaluations": t["evaluations"],
+                "win_pct": win_pct,
+            })
+        return rows
+
+    track_ab = _track(["Model A", "Model B"])
+    track_cd = _track(["Model C", "Model D"])
+
     cases = session.exec(select(Case).order_by(Case.id)).all()
     return templates.TemplateResponse(
         "admin/dashboard.html",
@@ -685,6 +715,8 @@ def admin_dashboard(request: Request, session: SessionDep):
             "annotator_count": annotator_count,
             "model_summaries_by_case": model_summaries_by_case,
             "cases": cases,
+            "track_ab": track_ab,
+            "track_cd": track_cd,
         },
     )
 

@@ -21,8 +21,48 @@
       <p class="text-sm text-gray-600 mt-1">Active annotators</p>
     </div>
   </div>
+  {# ── Global preference summary ────────────────────────────── #}
+  {% macro track_card(label, track, color) %}
+  <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide mb-4
+      {% if color == 'blue' %}text-blue-600{% else %}text-purple-600{% endif %}">
+      {{ label }}
+    </p>
+    {% set total_pref = track | sum(attribute='preferred') %}
+    {% for m in track %}
+    <div class="mb-3">
+      <div class="flex justify-between text-sm mb-1">
+        <span class="font-medium text-gray-800">{{ m.model_name }}</span>
+        <span class="text-gray-500">
+          {{ m.preferred }} preferred
+          {% if m.win_pct is not none %}<span class="font-semibold
+            {% if color == 'blue' %}text-blue-600{% else %}text-purple-600{% endif %}">
+            ({{ m.win_pct }}%)
+          </span>{% endif %}
+        </span>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-3">
+        <div class="h-3 rounded-full transition-all
+          {% if color == 'blue' %}bg-blue-500{% else %}bg-purple-500{% endif %}"
+          style="width: {{ m.win_pct if m.win_pct is not none else 0 }}%">
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mt-0.5">{{ m.evaluations }} evaluations received</p>
+    </div>
+    {% endfor %}
+    {% if total_pref == 0 %}
+    <p class="text-xs text-gray-400 text-center mt-2">No evaluations yet.</p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+    {{ track_card("Track 1 · Model A vs Model B", track_ab, "blue") }}
+    {{ track_card("Track 2 · Model C vs Model D", track_cd, "purple") }}
+  </div>
+
   <p class="text-xs text-gray-500 mt-2">
-    Each case has a different clinical question; models A and B are compared in one set of cases, C and D in another. &quot;Times preferred&quot; = how often this model was chosen as best for that case.
+    &quot;Times preferred&quot; = how often this model was chosen as the preferred report across all cases. Percentage = share of expressed preferences within each comparison track.
   </p>
 
   {% for case in cases %}
