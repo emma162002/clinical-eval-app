@@ -7,19 +7,25 @@
   <p class="text-sm text-gray-600">
     Overview of evaluation activity and data quality.
   </p>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-      <p class="text-3xl font-bold text-blue-600">{{ total_cases }}</p>
-      <p class="text-sm text-gray-600 mt-1">Total cases</p>
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div class="grid grid-cols-3 gap-4 flex-1">
+      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+        <p class="text-3xl font-bold text-blue-600">{{ total_cases }}</p>
+        <p class="text-sm text-gray-600 mt-1">Total cases</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+        <p class="text-3xl font-bold text-slate-600">{{ total_evaluations }}</p>
+        <p class="text-sm text-gray-600 mt-1">Total evaluations</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+        <p class="text-3xl font-bold text-emerald-600">{{ annotator_count }}</p>
+        <p class="text-sm text-gray-600 mt-1">Active annotators</p>
+      </div>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-      <p class="text-3xl font-bold text-slate-600">{{ total_evaluations }}</p>
-      <p class="text-sm text-gray-600 mt-1">Total evaluations</p>
-    </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-      <p class="text-3xl font-bold text-emerald-600">{{ annotator_count }}</p>
-      <p class="text-sm text-gray-600 mt-1">Active annotators</p>
-    </div>
+    <a href="/admin/export/csv"
+       class="inline-flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-emerald-700 whitespace-nowrap">
+      ⬇ Download evaluations CSV
+    </a>
   </div>
   {# ── Global preference summary ────────────────────────────── #}
   {% macro track_card(label, track, color) %}
@@ -101,9 +107,6 @@
   <p class="text-xs text-green-700 mt-1">Green row = model(s) with the highest &quot;Times preferred&quot; for this case.</p>
   {% endfor %}
 
-  <div class="flex flex-wrap gap-3 mt-6">
-    <a href="/admin/export/csv" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700">Download evaluations CSV</a>
-  </div>
   <div class="flex flex-wrap gap-3 mt-2">
     <a href="{{ request.url_for('admin_progress') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Progress</a>
     <a href="{{ request.url_for('admin_quality') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Data quality</a>
