@@ -7,24 +7,25 @@
   <p class="text-sm text-gray-600">
     Overview of evaluation activity and data quality.
   </p>
-  <div class="flex items-center justify-between flex-wrap gap-3">
-    <div class="grid grid-cols-3 gap-4 flex-1">
-      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-        <p class="text-3xl font-bold text-blue-600">{{ total_cases }}</p>
-        <p class="text-sm text-gray-600 mt-1">Total cases</p>
-      </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-        <p class="text-3xl font-bold text-slate-600">{{ total_evaluations }}</p>
-        <p class="text-sm text-gray-600 mt-1">Total evaluations</p>
-      </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-        <p class="text-3xl font-bold text-emerald-600">{{ annotator_count }}</p>
-        <p class="text-sm text-gray-600 mt-1">Active annotators</p>
-      </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-blue-600">{{ total_cases }}</p>
+      <p class="text-sm text-gray-600 mt-1">Total cases</p>
     </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-gray-700">{{ total_evaluations }}</p>
+      <p class="text-sm text-gray-600 mt-1">Total evaluations</p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+      <p class="text-3xl font-bold text-green-600">{{ annotator_count }}</p>
+      <p class="text-sm text-gray-600 mt-1">Active annotators</p>
+    </div>
+  </div>
+
+  <div>
     <a href="/admin/export/csv"
-       class="inline-flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-emerald-700 whitespace-nowrap">
-      ⬇ Download evaluations CSV
+       style="background-color:#16a34a; color:#ffffff; display:inline-block; padding:10px 20px; border-radius:8px; font-weight:600; font-size:0.875rem; text-decoration:none;">
+      Download evaluations CSV
     </a>
   </div>
   {# ── Global preference summary ────────────────────────────── #}
