@@ -20,12 +20,46 @@ Admin: `admin` / `admin123`.
 - **Frontend:** Jinja2 templates in `app/templates/` (Tailwind CSS), static files in `app/static/`.
 - **Docker:** `Dockerfile` (Python 3.11-slim, uvicorn on port 8000); `docker-compose.yml` builds the app and exposes 8000, mounts `./data` for the DB.
 
+## Evaluation protocol & design rationale
+
+### Why pairwise comparison, not just ratings
+
+Absolute rating scales (1–5) are notoriously sensitive to inter-annotator scale bias: one radiologist's "4" is another's "2". Pairwise preference ("which output would you sign as the final report?") is more reliable because it is a relative judgement that does not require calibration across annotators. Crucially, it maps directly onto the data format required by **Direct Preference Optimisation (DPO)**: each submitted evaluation produces a `(prompt, chosen, rejected)` triple that can be fed into a DPO training loop without any additional preprocessing.
+
+The four rating dimensions — overall quality, clinical accuracy, completeness, and safety — are collected alongside the preference because they decompose the preference signal into interpretable axes. A model may be preferred overall while still hallucinating findings or omitting safety-relevant observations; the dimensional scores and error flags capture this nuance and enable targeted fine-tuning.
+
+### Error flags as categorical signals
+
+Binary flags (hallucination, missing important findings, formatting issues, safety concern) complement ordinal ratings by identifying *failure modes* rather than just severity. These can be used to filter training data (e.g. exclude hallucinated outputs from the preferred set) or to train a reward model that penalises specific error types independently of overall quality.
+
+### Session-based round system
+
+Each login session is treated as an independent annotation round. When a clinician completes all cases in their current batch, the system automatically generates a new round by copying the template cases with a round counter appended to the title (e.g. "CT chest – lung nodule follow-up (#2)"). This design serves two purposes:
+
+1. **Intra-annotator consistency**: repeated evaluations of the same underlying case across sessions allow measurement of how stable a clinician's preferences are over time, which is a proxy for annotation reliability.
+2. **Data accumulation without fatigue**: clinicians always have a manageable, bounded set of cases to evaluate (one batch = 6 cases), and the system scales data collection naturally across many sessions without requiring new content.
+
+### Inter-annotator agreement metrics
+
+The admin dashboard computes two complementary agreement metrics:
+
+- **Variance of quality ratings per output**: a low-overhead indicator of disagreement. High variance on a specific output signals that clinicians interpret it very differently, which is itself a finding (the output may be ambiguous or context-dependent).
+- **Pairwise Cohen's Kappa (unweighted)**: computed for each pair of annotators who have rated at least two common outputs. Kappa corrects for chance agreement, making it the standard metric in clinical annotation studies (κ > 0.6 = substantial, κ > 0.4 = moderate). Pairwise rather than multi-rater kappa is used here because the annotator pool is sparse (not all clinicians rate all outputs), which is the typical constraint in real consortium studies.
+
+### ROI spatial agreement
+
+Clinicians can draw freehand region-of-interest (ROI) annotations on case images. The bounding-box Intersection over Union (IoU) between each clinician's ROI and the model's predicted region (a fixed mock polygon per model, representing where the model "attended") is computed and displayed per output. IoU = intersection area / union area of the two bounding boxes, derived from the normalised polygon coordinates stored in the database. In a production system, the model ROI would be derived from attention maps or segmentation outputs; the mock polygon here is a structural placeholder that keeps the geometric computation real.
+
+### Data export
+
+All evaluation data (ratings, flags, preferences, timestamps) can be downloaded as CSV from the admin dashboard. The export is structured to be immediately usable for preference optimisation: one row per model output evaluation, with the `preferred_for_case` column directly encoding the chosen/rejected label for DPO.
+
 ## Sample data
 
 Sample data is created **automatically on first run** (no extra files to download). The seed (`app/seed.py`) runs at startup and, if the DB is empty:
 
 - **Users:** 3 doctors (`doctor1`, `doctor2`, `doctor3`) and 1 admin (`admin`), all with password `doctor123` / `admin123`.
-- **Cases:** 2 clinical cases with prompts and 2 model outputs each (e.g. CT chest lung nodule, Brain MRI stroke). Images use public-domain URLs or local placeholders.
+- **Cases:** 6 clinical cases across different modalities and pathologies (CT chest nodule, brain MRI stroke, chest X-ray pneumonia, abdominal CT liver lesion, knee MRI meniscus, mammography mass), each with 2 model outputs of contrasting quality to make evaluation meaningful.
 
 So after `docker-compose up --build`, open http://localhost:8000 and log in with the credentials above to use the app with sample data.
 
