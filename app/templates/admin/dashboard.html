@@ -62,6 +62,9 @@
   {% endfor %}
 
   <div class="flex flex-wrap gap-3 mt-6">
+    <a href="/admin/export/csv" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700">Download evaluations CSV</a>
+  </div>
+  <div class="flex flex-wrap gap-3 mt-2">
     <a href="{{ request.url_for('admin_progress') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Progress</a>
     <a href="{{ request.url_for('admin_quality') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Data quality</a>
     <a href="{{ request.url_for('admin_agreement') }}" class="inline-flex items-center px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800">Inter-annotator agreement</a>

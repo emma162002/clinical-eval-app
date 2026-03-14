@@ -1,5 +1,7 @@
 # clinical-eval-app (DECIPHER-M)
 
+Deploying multimodal foundation models in clinical oncology requires structured human feedback at scale. Radiologists' time is scarce, so collecting high-quality preference data must be frictionless. This application is a data-collection frontend for that pipeline: it lets clinicians evaluate model-drafted radiology reports side by side, express structured preferences, flag errors, and annotate images — while giving study coordinators real-time visibility into annotation coverage, inter-annotator agreement, and data quality. The resulting signals (pairwise preferences, quality ratings, error categories, ROI annotations) are designed to feed directly into preference optimisation pipelines such as DPO or RLHF.
+
 Web app for **clinical evaluation of AI model outputs** (e.g. radiology report drafts). Clinicians rate and compare model responses per case; admins view progress, agreement, and data quality.
 
 ## How it works
@@ -31,7 +33,7 @@ So after `docker-compose up --build`, open http://localhost:8000 and log in with
 
 **Doctor**
 - Case list with clinical prompts; open a case to see model outputs (text + optional image).
-- Rate each output: overall quality, clinical accuracy, completeness, safety (0–5).
+- Rate each output: overall quality, clinical accuracy, completeness, safety (1–5).
 - Flag issues: hallucination, missing important findings, formatting/structure issues, safety concern.
 - Choose preferred output per case; optional free-text feedback.
 - Optional ROI drawing on images (one ROI per output, saved for agreement/overlap analysis).
@@ -42,8 +44,9 @@ So after `docker-compose up --build`, open http://localhost:8000 and log in with
 - Dashboard: total cases, evaluations, annotators; per-case and per-model summary (counts, average scores, preferred counts).
 - Progress: completion and evaluation counts per annotator and per model.
 - Data quality: score distributions and error-flag counts per model.
-- Agreement: per-output agreement (mean, variance, preferred count); per-case preferred-output agreement.
-- ROI overlap: summary of saved ROIs (e.g. Dice-style placeholder) per case/model/doctor.
+- Agreement: per-output mean/variance, pairwise Cohen's Kappa on quality ratings, per-case preferred-output agreement.
+- ROI overlap: bounding-box IoU between each doctor's drawn ROI and the model's predicted region.
+- Data export: download all evaluations as CSV for downstream analysis.
 - Help desk: inbox and model management.
 
 ## Running the app

@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}ROI overlap – Admin{% endblock %}
-{% block header_title %}ROI overlap (Dice vs model){% endblock %}
+{% block header_title %}ROI overlap (bounding-box IoU vs model){% endblock %}
 
 {% block content %}
 <div class="space-y-6">
   <p class="text-sm text-gray-600">
-    For each case and model, this shows a randomly simulated Dice score between the model's ROI and each doctor's ROI (values between 0 and 1, re-sampled on every page load).
+    For each doctor who drew an ROI on a case image, this shows the bounding-box
+    Intersection over Union (IoU) between their annotation and the model's predicted ROI
+    (a fixed mock region stored per model). IoU = intersection / union of the two bounding
+    boxes, computed from normalised polygon coordinates. Values closer to 1 indicate the
+    doctor's region matches the model's predicted region more closely.
   </p>
 
   <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -15,7 +19,7 @@
           <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Case</th>
           <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
           <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Doctor</th>
-          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dice score</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">IoU (doctor vs model)</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
@@ -24,25 +28,22 @@
           <td class="px-4 py-2 text-sm text-gray-800">
             {{ p.case_id }} – {{ p.case_title[:35] }}{% if p.case_title|length > 35 %}…{% endif %}
           </td>
-          <td class="px-4 py-2 text-sm font-medium text-gray-900">
-            {{ p.model_name }}
-          </td>
-          <td class="px-4 py-2 text-sm text-gray-800">
-            {{ p.doctor }}
-          </td>
+          <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ p.model_name }}</td>
+          <td class="px-4 py-2 text-sm text-gray-800">{{ p.doctor }}</td>
           <td class="px-4 py-2 text-sm">
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-              {% if p.dice >= 0.8 %}bg-emerald-100 text-emerald-800
-              {% elif p.dice >= 0.5 %}bg-yellow-100 text-yellow-800
+              {% if p.iou >= 0.7 %}bg-emerald-100 text-emerald-800
+              {% elif p.iou >= 0.4 %}bg-yellow-100 text-yellow-800
               {% else %}bg-red-100 text-red-800{% endif %}">
-              {{ '%.2f'|format(p.dice) }}
+              {{ '%.3f'|format(p.iou) }}
             </span>
           </td>
         </tr>
         {% else %}
         <tr>
           <td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">
-            No ROIs saved yet. Once doctors draw and save ROIs, random Dice scores versus the model ROI will appear here.
+            No ROIs saved yet. Once doctors draw and save ROIs on case images, IoU against
+            the model's predicted region will appear here.
           </td>
         </tr>
         {% endfor %}
@@ -51,4 +52,3 @@
   </div>
 </div>
 {% endblock %}
-

@@ -8,6 +8,51 @@
     Agreement metrics between annotators: for each output with at least 2 evaluations we show mean and variance of quality; per case we show agreement on the preferred output.
   </p>
 
+  <section class="space-y-4">
+    <h3 class="font-semibold text-gray-900 text-lg">Cohen's Kappa – pairwise inter-annotator agreement</h3>
+    <p class="text-xs text-gray-500">
+      Unweighted Cohen's Kappa on <em>overall quality</em> ratings (1–5) for each pair of annotators
+      who both rated at least 2 common outputs. κ &gt; 0.6 = substantial, κ &gt; 0.4 = moderate,
+      κ ≤ 0.2 = slight / poor agreement.
+    </p>
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Annotator A</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Annotator B</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Shared outputs</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cohen's κ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for k in pairwise_kappa %}
+          <tr>
+            <td class="px-4 py-2 text-sm text-gray-800">{{ k.annotator_a }}</td>
+            <td class="px-4 py-2 text-sm text-gray-800">{{ k.annotator_b }}</td>
+            <td class="px-4 py-2 text-sm text-gray-600">{{ k.n_shared }}</td>
+            <td class="px-4 py-2 text-sm">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                {% if k.kappa >= 0.6 %}bg-emerald-100 text-emerald-800
+                {% elif k.kappa >= 0.4 %}bg-yellow-100 text-yellow-800
+                {% else %}bg-red-100 text-red-800{% endif %}">
+                {{ '%.3f'|format(k.kappa) }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">
+              No kappa yet — need at least 2 annotators rating ≥2 common outputs.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <hr class="border-gray-200 my-4" />
+
   {% for case in cases %}
   {% set agreement_case = agreement | selectattr('case_id', 'equalto', case.id) | list %}
   {% set preferred_case = case_preferred | selectattr('case_id', 'equalto', case.id) | list %}

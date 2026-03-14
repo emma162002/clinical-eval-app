@@ -1,10 +1,13 @@
+import csv
+import io
 import os
 import json
+from itertools import combinations
 from pathlib import Path
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -30,7 +33,15 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 BASE_DIR = Path(__file__).resolve().parent
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY env var is not set. Sessions will use an insecure default key. "
+        "Set SECRET_KEY in docker-compose.yml or your environment.",
+        stacklevel=1,
+    )
+    SECRET_KEY = "dev-secret-change-in-production"
 
 # Direct Wikipedia Commons URLs (public domain) – used when local JPGs are not present
 CHEST_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/f/fc/Chest_X-ray.jpg"
@@ -618,6 +629,55 @@ def admin_dashboard(request: Request, session: SessionDep):
     )
 
 
+@app.get("/admin/export/csv")
+def export_evaluations_csv(request: Request, session: SessionDep):
+    user = require_admin(request, session)
+    if user is None:
+        return RedirectResponse(url="/login?role=admin", status_code=302)
+
+    evals = session.exec(
+        select(Evaluation).join(ModelOutput).order_by(Evaluation.created_at)
+    ).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "evaluation_id", "created_at", "annotator_id",
+        "case_id", "case_title", "model_name",
+        "overall_quality", "clinical_accuracy", "completeness", "safety",
+        "preferred_for_case",
+        "hallucination", "missing_important_findings", "formatting_issues", "safety_concerns",
+        "free_text_feedback",
+    ])
+    for e in evals:
+        if not e.output or not e.output.case:
+            continue
+        writer.writerow([
+            e.id,
+            e.created_at.isoformat() if e.created_at else "",
+            e.annotator_id,
+            e.output.case_id,
+            e.output.case.title,
+            e.output.model_name,
+            e.overall_quality if e.overall_quality > 0 else "",
+            e.clinical_accuracy if e.clinical_accuracy > 0 else "",
+            e.completeness if e.completeness > 0 else "",
+            e.safety if e.safety > 0 else "",
+            e.preferred_for_case,
+            e.hallucination,
+            e.missing_important_findings,
+            e.formatting_issues,
+            e.safety_concerns,
+            e.free_text_feedback or "",
+        ])
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=evaluations.csv"},
+    )
+
+
 @app.get("/admin/progress", response_class=HTMLResponse)
 def admin_progress(request: Request, session: SessionDep):
     user = require_admin(request, session)
@@ -739,6 +799,47 @@ def admin_quality(request: Request, session: SessionDep):
     )
 
 
+def _cohen_kappa(ratings_a: list[int], ratings_b: list[int]) -> float | None:
+    """Unweighted Cohen's Kappa for two raters over the same set of items (categories 1–5)."""
+    n = len(ratings_a)
+    if n < 2:
+        return None
+    categories = range(1, 6)
+    po = sum(1 for a, b in zip(ratings_a, ratings_b) if a == b) / n
+    pe = sum((ratings_a.count(c) / n) * (ratings_b.count(c) / n) for c in categories)
+    if pe >= 1.0:
+        return 1.0
+    return round((po - pe) / (1 - pe), 3)
+
+
+def _compute_pairwise_kappa(session: Session) -> list[dict]:
+    """For each pair of annotators sharing ≥2 rated outputs, compute Cohen's Kappa on overall quality."""
+    evals = session.exec(select(Evaluation).join(ModelOutput)).all()
+    # annotator -> {output_id: overall_quality} for non-zero ratings only
+    by_annot: dict[str, dict[int, int]] = {}
+    for e in evals:
+        if e.overall_quality == 0:
+            continue
+        by_annot.setdefault(e.annotator_id, {})[e.output_id] = e.overall_quality
+
+    results: list[dict] = []
+    for annot_a, annot_b in combinations(sorted(by_annot.keys()), 2):
+        shared = sorted(set(by_annot[annot_a]) & set(by_annot[annot_b]))
+        if len(shared) < 2:
+            continue
+        ratings_a = [by_annot[annot_a][oid] for oid in shared]
+        ratings_b = [by_annot[annot_b][oid] for oid in shared]
+        kappa = _cohen_kappa(ratings_a, ratings_b)
+        if kappa is not None:
+            results.append({
+                "annotator_a": annot_a,
+                "annotator_b": annot_b,
+                "n_shared": len(shared),
+                "kappa": kappa,
+            })
+    return results
+
+
 def _compute_agreement(session: Session) -> list[dict]:
     """Per-case and per-output agreement metrics."""
     cases = session.exec(select(Case).order_by(Case.id)).all()
@@ -789,15 +890,45 @@ def _deduplicate_roi(session: Session) -> None:
     session.commit()
 
 
-def _compute_roi_dice(session: Session) -> list[dict]:
-    """Return a random Dice score between model ROI (conceptual) and each doctor's ROI, per output.
+def _bbox_iou(points_a: list[dict], points_b: list[dict]) -> float:
+    """Bounding-box IoU between two freehand ROIs stored as lists of {x, y} normalised points."""
+    def bbox(pts: list[dict]) -> tuple[float, float, float, float]:
+        xs = [p["x"] for p in pts]
+        ys = [p["y"] for p in pts]
+        return min(xs), min(ys), max(xs), max(ys)
 
-    Only includes ROIs where the doctor actually drew points on the image (non-empty points_json).
-    At most one ROI per (output_id, user_id); duplicates are removed before computing.
-    This does NOT compute real geometric overlap; it just samples a random number in [0, 1].
+    ax1, ay1, ax2, ay2 = bbox(points_a)
+    bx1, by1, bx2, by2 = bbox(points_b)
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    if ix2 <= ix1 or iy2 <= iy1:
+        return 0.0
+    inter = (ix2 - ix1) * (iy2 - iy1)
+    area_a = (ax2 - ax1) * (ay2 - ay1)
+    area_b = (bx2 - bx1) * (by2 - by1)
+    union = area_a + area_b - inter
+    return round(inter / union, 3) if union > 0 else 0.0
+
+
+# Fixed mock model-predicted ROIs (normalised polygon coordinates, one per model).
+# These represent the region the model flagged as relevant; they are static and
+# intentionally simple so the bounding-box IoU computation is meaningful even
+# though the underlying model prediction is mocked.
+_MODEL_ROIS: dict[str, list[dict]] = {
+    "Model A": [{"x": 0.55, "y": 0.25}, {"x": 0.75, "y": 0.25}, {"x": 0.75, "y": 0.55}, {"x": 0.55, "y": 0.55}],
+    "Model B": [{"x": 0.45, "y": 0.20}, {"x": 0.72, "y": 0.20}, {"x": 0.72, "y": 0.50}, {"x": 0.45, "y": 0.50}],
+    "Model C": [{"x": 0.30, "y": 0.30}, {"x": 0.55, "y": 0.30}, {"x": 0.55, "y": 0.60}, {"x": 0.30, "y": 0.60}],
+    "Model D": [{"x": 0.35, "y": 0.25}, {"x": 0.60, "y": 0.25}, {"x": 0.60, "y": 0.58}, {"x": 0.35, "y": 0.58}],
+}
+
+
+def _compute_roi_iou(session: Session) -> list[dict]:
+    """Bounding-box IoU between each doctor's drawn ROI and the model's fixed mock ROI.
+
+    The model ROI is a static polygon defined in _MODEL_ROIS (mock prediction).
+    The doctor ROI is the actual freehand annotation stored in EvaluationROI.
+    IoU is computed from the bounding boxes of those two polygons.
     """
-    import random
-
     _deduplicate_roi(session)
     rois = session.exec(select(EvaluationROI).join(ModelOutput)).all()
     if not rois:
@@ -810,19 +941,20 @@ def _compute_roi_dice(session: Session) -> list[dict]:
         output = session.get(ModelOutput, r.output_id)
         if not output or not output.case:
             continue
+        model_roi = _MODEL_ROIS.get(output.model_name)
+        if not model_roi:
+            continue  # no mock ROI defined for this model name
         case = output.case
         user = session.get(User, r.user_id)
-        dice = round(random.random(), 3)
-        results.append(
-            {
-                "case_id": case.id,
-                "case_title": case.title,
-                "model_name": output.model_name,
-                "doctor": user.username if user else r.annotator_id,
-                "dice": dice,
-            }
-        )
-    # sort by case, model, doctor
+        doctor_points = json.loads(r.points_json)
+        iou = _bbox_iou(doctor_points, model_roi)
+        results.append({
+            "case_id": case.id,
+            "case_title": case.title,
+            "model_name": output.model_name,
+            "doctor": user.username if user else r.annotator_id,
+            "iou": iou,
+        })
     results.sort(key=lambda x: (x["case_id"], x["model_name"], x["doctor"]))
     return results
 
@@ -833,6 +965,7 @@ def admin_agreement(request: Request, session: SessionDep):
     if user is None:
         return RedirectResponse(url="/login?role=admin", status_code=302)
     agreement = _compute_agreement(session)
+    pairwise_kappa = _compute_pairwise_kappa(session)
     # Per-case preferred output agreement
     cases = session.exec(select(Case).order_by(Case.id)).all()
     case_preferred = []
@@ -865,6 +998,7 @@ def admin_agreement(request: Request, session: SessionDep):
             "agreement": agreement,
             "case_preferred": case_preferred,
             "cases": cases,
+            "pairwise_kappa": pairwise_kappa,
         },
     )
 
@@ -874,7 +1008,7 @@ def admin_roi(request: Request, session: SessionDep):
     user = require_admin(request, session)
     if user is None:
         return RedirectResponse(url="/login?role=admin", status_code=302)
-    pairs = _compute_roi_dice(session)
+    pairs = _compute_roi_iou(session)
     return templates.TemplateResponse(
         "admin/roi.html",
         {
