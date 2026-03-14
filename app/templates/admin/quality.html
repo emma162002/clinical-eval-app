@@ -22,7 +22,7 @@
             <li class="flex items-center gap-2">
               <span class="w-5 text-xs text-gray-600">{{ score }}</span>
               <span class="flex-1 bg-gray-200 rounded h-3 overflow-hidden" style="max-width: 180px;">
-                <span class="block bg-blue-500 h-full rounded" style="width: {{ (stats.overall.get(score, 0) * 100.0 / stats.count) if stats.count else 0 }}%;"></span>
+                <span class="block bg-blue-500 h-full rounded" style="width: {{ (stats.overall.get(score, 0) * 100.0 / stats.rated.overall) if stats.rated.overall else 0 }}%;"></span>
               </span>
               <span class="text-xs text-gray-600">{{ stats.overall.get(score, 0) }}</span>
             </li>
@@ -36,7 +36,7 @@
             <li class="flex items-center gap-2">
               <span class="w-5 text-xs text-gray-600">{{ score }}</span>
               <span class="flex-1 bg-gray-200 rounded h-3 overflow-hidden" style="max-width: 180px;">
-                <span class="block bg-indigo-500 h-full rounded" style="width: {{ (stats.accuracy.get(score, 0) * 100.0 / stats.count) if stats.count else 0 }}%;"></span>
+                <span class="block bg-indigo-500 h-full rounded" style="width: {{ (stats.accuracy.get(score, 0) * 100.0 / stats.rated.accuracy) if stats.rated.accuracy else 0 }}%;"></span>
               </span>
               <span class="text-xs text-gray-600">{{ stats.accuracy.get(score, 0) }}</span>
             </li>
@@ -52,7 +52,7 @@
               <span class="flex-1 bg-gray-200 rounded h-3 overflow-hidden" style="max-width: 180px;">
                 <span class="block h-full rounded" style="
                   background: linear-gradient(90deg, #f97316, #fbbf24);
-                  width: {{ (stats.completeness.get(score, 0) * 100.0 / stats.count) if stats.count else 0 }}%;
+                  width: {{ (stats.completeness.get(score, 0) * 100.0 / stats.rated.completeness) if stats.rated.completeness else 0 }}%;
                 "></span>
               </span>
               <span class="text-xs text-gray-600">{{ stats.completeness.get(score, 0) }}</span>
@@ -67,7 +67,7 @@
             <li class="flex items-center gap-2">
               <span class="w-5 text-xs text-gray-600">{{ score }}</span>
               <span class="flex-1 bg-gray-200 rounded h-3 overflow-hidden" style="max-width: 180px;">
-                <span class="block bg-red-500 h-full rounded" style="width: {{ (stats.safety.get(score, 0) * 100.0 / stats.count) if stats.count else 0 }}%;"></span>
+                <span class="block bg-red-500 h-full rounded" style="width: {{ (stats.safety.get(score, 0) * 100.0 / stats.rated.safety) if stats.rated.safety else 0 }}%;"></span>
               </span>
               <span class="text-xs text-gray-600">{{ stats.safety.get(score, 0) }}</span>
             </li>

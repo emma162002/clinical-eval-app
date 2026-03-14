@@ -48,7 +48,13 @@
   method="post"
   action="/evaluation/cases/{{ case.id }}/submit"
   class="space-y-6"
-  onsubmit="return confirm('Are you sure you want to submit these ratings? You will not be able to change them afterwards.');"
+  onsubmit="
+    if (!document.querySelector('input[name=preferred_output_id]:checked')) {
+      alert('Please select a preferred output before submitting.');
+      return false;
+    }
+    return confirm('Are you sure you want to submit these ratings? You will not be able to change them afterwards.');
+  "
 >
   <div class="bg-blue-50/60 border-l-4 border-blue-500 rounded-lg shadow p-5 border border-blue-100">
     <span class="text-xs font-semibold text-blue-700 uppercase tracking-wide">To complete</span>

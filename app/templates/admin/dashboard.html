@@ -25,9 +25,9 @@
     Each case has a different clinical question; models A and B are compared in one set of cases, C and D in another. &quot;Times preferred&quot; = how often this model was chosen as best for that case.
   </p>
 
-  {% for case_num, section_label in [(1, 'Model A vs B'), (2, 'Model C vs D')] %}
-  {% set summaries = model_summaries_by_case.get(case_num, []) %}
-  <h3 class="text-base font-semibold text-gray-900 mt-6">{{ section_label }} – Average ratings per model</h3>
+  {% for case in cases %}
+  {% set summaries = model_summaries_by_case.get(case.id, []) %}
+  <h3 class="text-base font-semibold text-gray-900 mt-6">Case {{ case.id }}: {{ case.title }} – Average ratings per model</h3>
   <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mt-2">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
@@ -53,12 +53,12 @@
           <td class="px-4 py-2 text-gray-600">{{ s.avg_safety }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="px-4 py-6 text-center text-gray-500 text-sm">No evaluations for {{ section_label }} yet.</td></tr>
+        <tr><td colspan="7" class="px-4 py-6 text-center text-gray-500 text-sm">No evaluations for Case {{ case.id }} yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="text-xs text-green-700 mt-1">Green row = model(s) with the highest &quot;Times preferred&quot; in {{ section_label }}.</p>
+  <p class="text-xs text-green-700 mt-1">Green row = model(s) with the highest &quot;Times preferred&quot; for this case.</p>
   {% endfor %}
 
   <div class="flex flex-wrap gap-3 mt-6">

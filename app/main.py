@@ -171,8 +171,14 @@ def view_case(case_id: int, request: Request, session: SessionDep):
     if not outputs:
         return HTMLResponse("No outputs available for this case", status_code=404)
 
-    completed_cases = request.session.get("completed_cases", [])
-    completed = case_id in completed_cases
+    output_ids = [o.id for o in outputs]
+    existing_eval = session.exec(
+        select(Evaluation).where(
+            Evaluation.user_id == user.id,
+            Evaluation.output_id.in_(output_ids),
+        )
+    ).first()
+    completed = existing_eval is not None
 
     next_case = (
         session.exec(
@@ -212,8 +218,22 @@ async def submit_case_evaluations(
     if not outputs:
         return HTMLResponse("No outputs available for this case", status_code=404)
 
+    # Fix 1: DB-backed duplicate check
+    output_ids = [o.id for o in outputs]
+    existing_eval = session.exec(
+        select(Evaluation).where(
+            Evaluation.user_id == user.id,
+            Evaluation.output_id.in_(output_ids),
+        )
+    ).first()
+    if existing_eval:
+        return HTMLResponse("You have already submitted ratings for this case.", status_code=400)
+
     preferred_output_id_raw = form.get("preferred_output_id")
-    preferred_output_id = int(preferred_output_id_raw) if preferred_output_id_raw else None
+    # Fix 3: require preferred output selection
+    if not preferred_output_id_raw:
+        return HTMLResponse("Please select a preferred output before submitting.", status_code=400)
+    preferred_output_id = int(preferred_output_id_raw)
 
     for output in outputs:
         prefix = f"output_{output.id}_"
@@ -240,12 +260,6 @@ async def submit_case_evaluations(
         session.add(evaluation)
 
     session.commit()
-
-    # Mark this case as completed only for the current session
-    completed_cases = request.session.get("completed_cases", [])
-    if case_id not in completed_cases:
-        completed_cases.append(case_id)
-    request.session["completed_cases"] = completed_cases
 
     next_case = (
         session.exec(
@@ -567,10 +581,15 @@ def admin_dashboard(request: Request, session: SessionDep):
             if n == 0:
                 continue
             preferred_count = sum(1 for x in lst if x.preferred_for_case)
-            avg_overall = sum(x.overall_quality for x in lst) / n
-            avg_accuracy = sum(x.clinical_accuracy for x in lst) / n
-            avg_completeness = sum(x.completeness for x in lst) / n
-            avg_safety = sum(x.safety for x in lst) / n
+
+            def _avg(vals: list[int]) -> float | None:
+                nz = [v for v in vals if v > 0]
+                return round(sum(nz) / len(nz), 2) if nz else None
+
+            avg_overall = _avg([x.overall_quality for x in lst])
+            avg_accuracy = _avg([x.clinical_accuracy for x in lst])
+            avg_completeness = _avg([x.completeness for x in lst])
+            avg_safety = _avg([x.safety for x in lst])
             summaries.append({
                 "model_name": model_name,
                 "evaluations_count": n,
@@ -584,6 +603,7 @@ def admin_dashboard(request: Request, session: SessionDep):
         for s in summaries:
             s["is_most_preferred"] = max_preferred > 0 and s["preferred_count"] == max_preferred
         model_summaries_by_case[case_id] = summaries
+    cases = session.exec(select(Case).order_by(Case.id)).all()
     return templates.TemplateResponse(
         "admin/dashboard.html",
         {
@@ -593,6 +613,7 @@ def admin_dashboard(request: Request, session: SessionDep):
             "total_evaluations": total_evals,
             "annotator_count": annotator_count,
             "model_summaries_by_case": model_summaries_by_case,
+            "cases": cases,
         },
     )
 
@@ -668,6 +689,7 @@ def admin_quality(request: Request, session: SessionDep):
                 "accuracy": {},
                 "completeness": {},
                 "safety": {},
+                "rated": {"overall": 0, "accuracy": 0, "completeness": 0, "safety": 0},
                 "count": 0,
                 "flags": {
                     "hallucination": 0,
@@ -677,10 +699,19 @@ def admin_quality(request: Request, session: SessionDep):
                 },
             }
         m = per_model[model_name]
-        m["overall"][e.overall_quality] = m["overall"].get(e.overall_quality, 0) + 1
-        m["accuracy"][e.clinical_accuracy] = m["accuracy"].get(e.clinical_accuracy, 0) + 1
-        m["completeness"][e.completeness] = m["completeness"].get(e.completeness, 0) + 1
-        m["safety"][e.safety] = m["safety"].get(e.safety, 0) + 1
+        # Fix 2: exclude 0 ("not filled") from distributions and rated counts
+        if e.overall_quality > 0:
+            m["overall"][e.overall_quality] = m["overall"].get(e.overall_quality, 0) + 1
+            m["rated"]["overall"] += 1
+        if e.clinical_accuracy > 0:
+            m["accuracy"][e.clinical_accuracy] = m["accuracy"].get(e.clinical_accuracy, 0) + 1
+            m["rated"]["accuracy"] += 1
+        if e.completeness > 0:
+            m["completeness"][e.completeness] = m["completeness"].get(e.completeness, 0) + 1
+            m["rated"]["completeness"] += 1
+        if e.safety > 0:
+            m["safety"][e.safety] = m["safety"].get(e.safety, 0) + 1
+            m["rated"]["safety"] += 1
         m["count"] += 1
         if e.hallucination:
             m["flags"]["hallucination"] += 1
@@ -719,7 +750,10 @@ def _compute_agreement(session: Session) -> list[dict]:
                 ).all()
                 if len(evals) < 2:
                     continue
-                qualities = [e.overall_quality for e in evals]
+                # Fix 2: exclude 0 ("not rated") from agreement metrics
+                qualities = [e.overall_quality for e in evals if e.overall_quality > 0]
+                if len(qualities) < 2:
+                    continue
                 preferred = sum(1 for e in evals if e.preferred_for_case)
                 mean_q = sum(qualities) / len(qualities)
                 variance = sum((q - mean_q) ** 2 for q in qualities) / len(qualities) if qualities else 0
@@ -830,6 +864,7 @@ def admin_agreement(request: Request, session: SessionDep):
             "current_user": user,
             "agreement": agreement,
             "case_preferred": case_preferred,
+            "cases": cases,
         },
     )
 

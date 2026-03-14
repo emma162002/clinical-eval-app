@@ -8,11 +8,11 @@
     Agreement metrics between annotators: for each output with at least 2 evaluations we show mean and variance of quality; per case we show agreement on the preferred output.
   </p>
 
-  {% for case_num in [1, 2] %}
-  {% set agreement_case = agreement | selectattr('case_id', 'equalto', case_num) | list %}
-  {% set preferred_case = case_preferred | selectattr('case_id', 'equalto', case_num) | list %}
+  {% for case in cases %}
+  {% set agreement_case = agreement | selectattr('case_id', 'equalto', case.id) | list %}
+  {% set preferred_case = case_preferred | selectattr('case_id', 'equalto', case.id) | list %}
   <section class="space-y-4">
-    <h3 class="font-semibold text-gray-900 text-lg">Case {{ case_num }}</h3>
+    <h3 class="font-semibold text-gray-900 text-lg">Case {{ case.id }}: {{ case.title }}</h3>
 
     <h4 class="font-medium text-gray-800">Agreement per output (quality 1–5)</h4>
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
