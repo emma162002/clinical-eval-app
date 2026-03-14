@@ -665,10 +665,10 @@ def admin_dashboard(request: Request, session: SessionDep):
                 "model_name": model_name,
                 "evaluations_count": n,
                 "preferred_count": preferred_count,
-                "avg_overall": round(avg_overall, 2),
-                "avg_accuracy": round(avg_accuracy, 2),
-                "avg_completeness": round(avg_completeness, 2),
-                "avg_safety": round(avg_safety, 2),
+                "avg_overall": avg_overall if avg_overall is not None else "–",
+                "avg_accuracy": avg_accuracy if avg_accuracy is not None else "–",
+                "avg_completeness": avg_completeness if avg_completeness is not None else "–",
+                "avg_safety": avg_safety if avg_safety is not None else "–",
             })
         max_preferred = max((s["preferred_count"] for s in summaries), default=0)
         for s in summaries:
