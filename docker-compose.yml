@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
+      - ./data:/code/data
     environment:
       - APP_ENV=production
       - SECRET_KEY=replace-this-with-a-random-secret-before-sharing
