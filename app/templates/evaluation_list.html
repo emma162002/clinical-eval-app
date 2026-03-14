@@ -2,62 +2,97 @@
 {% block title %}Case evaluation – Clinical Evaluation{% endblock %}
 {% block header_title %}Case evaluation{% endblock %}
 
+{% macro case_card(item, accent) %}
+{% set c = item.case %}
+{% set done = item.completed %}
+<a href="/evaluation/cases/{{ c.id }}" class="group block rounded-2xl border shadow-sm transition-all overflow-hidden
+  {% if done %}bg-gray-50 border-gray-200 opacity-70 hover:opacity-90
+  {% elif accent == 'blue' %}bg-white border-gray-200 hover:shadow-lg hover:border-blue-300
+  {% else %}bg-white border-gray-200 hover:shadow-lg hover:border-purple-300{% endif %}">
+  <div class="p-5 md:p-6 flex items-start gap-4">
+    <span class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-colors
+      {% if done %}bg-emerald-100 text-emerald-600
+      {% elif accent == 'blue' %}bg-blue-100 text-blue-600 group-hover:bg-blue-200
+      {% else %}bg-purple-100 text-purple-600 group-hover:bg-purple-200{% endif %}">
+      {% if done %}✓{% else %}→{% endif %}
+    </span>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2 flex-wrap">
+        <h3 class="text-base font-semibold {% if done %}text-gray-400{% elif accent == 'blue' %}text-gray-900 group-hover:text-blue-700{% else %}text-gray-900 group-hover:text-purple-700{% endif %} transition-colors">
+          {{ c.title }}
+        </h3>
+        {% if done %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Completed</span>
+        {% endif %}
+      </div>
+      <p class="text-sm text-gray-500 mt-1">
+        {{ (c.clinical_prompt or '')[:180] }}{% if (c.clinical_prompt or '')|length > 180 %}…{% endif %}
+      </p>
+      {% if not done %}
+      <span class="inline-flex items-center gap-1 mt-2 text-xs font-medium
+        {% if accent == 'blue' %}text-blue-600 group-hover:text-blue-700{% else %}text-purple-600 group-hover:text-purple-700{% endif %}">
+        Open case →
+      </span>
+      {% endif %}
+    </div>
+  </div>
+</a>
+{% endmacro %}
+
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
-  <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-6 md:p-8 text-white">
+
+  <div class="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl shadow-xl p-6 md:p-8 text-white">
     <div class="flex items-center justify-between mb-2">
       <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Select a case</h2>
       {% if round_num > 1 %}
       <span class="text-xs font-semibold bg-white/20 text-white rounded-full px-3 py-1">Round {{ round_num }}</span>
       {% endif %}
     </div>
-    <p class="text-blue-100 text-base md:text-lg">
-      Choose a case to evaluate model outputs (images and draft reports). Rate quality, accuracy, completeness and safety, then pick your preferred report.
+    <p class="text-slate-300 text-sm md:text-base">
+      Cases are split into two comparison tracks. Evaluate each case independently — rate both outputs, then pick your preferred report.
     </p>
   </div>
 
-  {% if case_items %}
-  <div class="grid gap-4">
-    {% for item in case_items %}
-    {% set c = item.case %}
-    {% set done = item.completed %}
-    <a href="/evaluation/cases/{{ c.id }}" class="group block rounded-2xl border shadow-sm transition-all overflow-hidden
-      {% if done %}bg-gray-50 border-gray-200 opacity-70 hover:opacity-90{% else %}bg-white border-gray-200 hover:shadow-lg hover:border-blue-200{% endif %}">
-      <div class="p-5 md:p-6 flex items-start gap-4">
-        <span class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-colors
-          {% if done %}bg-emerald-100 text-emerald-600{% else %}bg-blue-100 text-blue-600 group-hover:bg-blue-200{% endif %}" aria-hidden="true">
-          {% if done %}✓{% else %}{{ loop.index }}{% endif %}
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap">
-            <h3 class="text-lg font-semibold {% if done %}text-gray-500{% else %}text-gray-900 group-hover:text-blue-700{% endif %} transition-colors">
-              {{ c.title }}
-            </h3>
-            {% if done %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Completed</span>
-            {% endif %}
-          </div>
-          <p class="text-sm text-gray-500 mt-1">
-            {{ (c.clinical_prompt or '')[:200] }}{% if (c.clinical_prompt or '')|length > 200 %}…{% endif %}
-          </p>
-          {% if not done %}
-          <span class="inline-flex items-center gap-1 mt-3 text-sm font-medium text-blue-600 group-hover:text-blue-700">
-            Open case
-            <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-          </span>
-          {% endif %}
-        </div>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
+  {# ── Model A vs B ─────────────────────────────────────────── #}
+  {% if group_ab %}
+  <section>
+    <div class="flex items-center gap-3 mb-3">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white">
+        Track 1 · Model A vs Model B
+      </span>
+      <span class="text-xs text-gray-400">{{ group_ab | selectattr('completed') | list | length }} / {{ group_ab | length }} completed</span>
+    </div>
+    <div class="grid gap-3">
+      {% for item in group_ab %}
+        {{ case_card(item, 'blue') }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# ── Model C vs D ─────────────────────────────────────────── #}
+  {% if group_cd %}
+  <section>
+    <div class="flex items-center gap-3 mb-3">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-purple-600 text-white">
+        Track 2 · Model C vs Model D
+      </span>
+      <span class="text-xs text-gray-400">{{ group_cd | selectattr('completed') | list | length }} / {{ group_cd | length }} completed</span>
+    </div>
+    <div class="grid gap-3">
+      {% for item in group_cd %}
+        {{ case_card(item, 'purple') }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if not group_ab and not group_cd %}
   <div class="bg-white rounded-2xl border border-gray-200 p-10 text-center">
-    <span class="inline-flex w-14 h-14 rounded-full bg-gray-100 text-gray-400 items-center justify-center mb-3" aria-hidden="true">
-      <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-    </span>
     <p class="text-gray-500 text-base">No cases available.</p>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}

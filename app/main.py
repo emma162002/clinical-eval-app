@@ -213,11 +213,30 @@ def evaluation_list(request: Request, session: SessionDep):
         if batch_ids else []
     )
     round_num = request.session.get("eval_round", 1)
-    case_items = [{"case": c, "completed": c.id in completed_cases} for c in cases]
+
+    # Group cases by model pair so the list shows A vs B first, then C vs D
+    group_ab: list[dict] = []
+    group_cd: list[dict] = []
+    for c in cases:
+        model_names = {
+            o.model_name
+            for o in session.exec(select(ModelOutput).where(ModelOutput.case_id == c.id)).all()
+        }
+        item = {"case": c, "completed": c.id in completed_cases}
+        if model_names & {"Model A", "Model B"}:
+            group_ab.append(item)
+        else:
+            group_cd.append(item)
 
     return templates.TemplateResponse(
         "evaluation_list.html",
-        {"request": request, "current_user": user, "case_items": case_items, "round_num": round_num},
+        {
+            "request": request,
+            "current_user": user,
+            "group_ab": group_ab,
+            "group_cd": group_cd,
+            "round_num": round_num,
+        },
     )
 
 
