@@ -182,14 +182,8 @@ def view_case(case_id: int, request: Request, session: SessionDep):
     if not outputs:
         return HTMLResponse("No outputs available for this case", status_code=404)
 
-    output_ids = [o.id for o in outputs]
-    existing_eval = session.exec(
-        select(Evaluation).where(
-            Evaluation.user_id == user.id,
-            Evaluation.output_id.in_(output_ids),
-        )
-    ).first()
-    completed = existing_eval is not None
+    completed_cases = request.session.get("completed_cases", [])
+    completed = case_id in completed_cases
 
     next_case = (
         session.exec(
@@ -229,17 +223,6 @@ async def submit_case_evaluations(
     if not outputs:
         return HTMLResponse("No outputs available for this case", status_code=404)
 
-    # Fix 1: DB-backed duplicate check
-    output_ids = [o.id for o in outputs]
-    existing_eval = session.exec(
-        select(Evaluation).where(
-            Evaluation.user_id == user.id,
-            Evaluation.output_id.in_(output_ids),
-        )
-    ).first()
-    if existing_eval:
-        return HTMLResponse("You have already submitted ratings for this case.", status_code=400)
-
     preferred_output_id_raw = form.get("preferred_output_id")
     # Fix 3: require preferred output selection
     if not preferred_output_id_raw:
@@ -271,6 +254,13 @@ async def submit_case_evaluations(
         session.add(evaluation)
 
     session.commit()
+
+    # Mark completed in the current login session so the doctor can't double-submit
+    # within the same session, but CAN re-evaluate on the next login.
+    completed_cases = request.session.get("completed_cases", [])
+    if case_id not in completed_cases:
+        completed_cases.append(case_id)
+    request.session["completed_cases"] = completed_cases
 
     next_case = (
         session.exec(
