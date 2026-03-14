@@ -5,7 +5,12 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
   <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-6 md:p-8 text-white">
-    <h2 class="text-2xl md:text-3xl font-bold tracking-tight mb-2">Select a case</h2>
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Select a case</h2>
+      {% if round_num > 1 %}
+      <span class="text-xs font-semibold bg-white/20 text-white rounded-full px-3 py-1">Round {{ round_num }}</span>
+      {% endif %}
+    </div>
     <p class="text-blue-100 text-base md:text-lg">
       Choose a case to evaluate model outputs (images and draft reports). Rate quality, accuracy, completeness and safety, then pick your preferred report.
     </p>
@@ -15,26 +20,33 @@
   <div class="grid gap-4">
     {% for item in case_items %}
     {% set c = item.case %}
-    <a href="/evaluation/cases/{{ c.id }}" class="group block bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all overflow-hidden">
+    {% set done = item.completed %}
+    <a href="/evaluation/cases/{{ c.id }}" class="group block rounded-2xl border shadow-sm transition-all overflow-hidden
+      {% if done %}bg-gray-50 border-gray-200 opacity-70 hover:opacity-90{% else %}bg-white border-gray-200 hover:shadow-lg hover:border-blue-200{% endif %}">
       <div class="p-5 md:p-6 flex items-start gap-4">
-        <span class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg group-hover:bg-blue-200 transition-colors" aria-hidden="true">
-          {{ c.id }}
+        <span class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-colors
+          {% if done %}bg-emerald-100 text-emerald-600{% else %}bg-blue-100 text-blue-600 group-hover:bg-blue-200{% endif %}" aria-hidden="true">
+          {% if done %}✓{% else %}{{ loop.index }}{% endif %}
         </span>
         <div class="min-w-0 flex-1">
-          <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
-            Case {{ c.id }} – {{ c.title }}
-          </h3>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-lg font-semibold {% if done %}text-gray-500{% else %}text-gray-900 group-hover:text-blue-700{% endif %} transition-colors">
+              {{ c.title }}
+            </h3>
+            {% if done %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Completed</span>
+            {% endif %}
+          </div>
           <p class="text-sm text-gray-500 mt-1">
             {{ (c.clinical_prompt or '')[:200] }}{% if (c.clinical_prompt or '')|length > 200 %}…{% endif %}
           </p>
+          {% if not done %}
           <span class="inline-flex items-center gap-1 mt-3 text-sm font-medium text-blue-600 group-hover:text-blue-700">
             Open case
             <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           </span>
+          {% endif %}
         </div>
-        <span class="flex-shrink-0 text-gray-300 group-hover:text-blue-400 transition-colors" aria-hidden="true">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        </span>
       </div>
     </a>
     {% endfor %}

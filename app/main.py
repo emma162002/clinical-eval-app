@@ -157,16 +157,67 @@ def home(request: Request, session: SessionDep):
     )
 
 
+def _generate_new_round(db: Session, round_num: int) -> list[Case]:
+    """Copy the seed/template cases into new DB rows with the round number appended to the title."""
+    from .seed import SEED_CASE_COUNT
+    template_cases = db.exec(select(Case).order_by(Case.id).limit(SEED_CASE_COUNT)).all()
+    new_cases: list[Case] = []
+    for tc in template_cases:
+        outputs = db.exec(select(ModelOutput).where(ModelOutput.case_id == tc.id)).all()
+        new_case = Case(
+            title=f"{tc.title} (#{round_num})",
+            clinical_prompt=tc.clinical_prompt,
+            modality=tc.modality,
+        )
+        db.add(new_case)
+        db.flush()
+        for out in outputs:
+            db.add(ModelOutput(
+                case_id=new_case.id,
+                model_name=out.model_name,
+                text_output=out.text_output,
+                image_url=out.image_url,
+            ))
+        new_cases.append(new_case)
+    db.commit()
+    return new_cases
+
+
 @app.get("/evaluation", response_class=HTMLResponse)
 def evaluation_list(request: Request, session: SessionDep):
     user = get_current_user(request, session)
     if user is None:
         return RedirectResponse(url="/login?role=doctor", status_code=302)
-    cases = session.exec(select(Case).order_by(Case.id)).all()
-    case_items = [{"case": c} for c in cases]
+
+    completed_cases = request.session.get("completed_cases", [])
+
+    # Initialise batch for this login session (first visit only)
+    batch_ids: list[int] | None = request.session.get("session_batch_ids")
+    if batch_ids is None:
+        from .seed import SEED_CASE_COUNT
+        template_cases = session.exec(select(Case).order_by(Case.id).limit(SEED_CASE_COUNT)).all()
+        batch_ids = [c.id for c in template_cases]
+        request.session["session_batch_ids"] = batch_ids
+
+    # If every case in the current batch has been submitted this session, open a new round
+    if batch_ids and all(cid in completed_cases for cid in batch_ids):
+        current_round = request.session.get("eval_round", 1)
+        new_cases = _generate_new_round(session, current_round + 1)
+        request.session["eval_round"] = current_round + 1
+        batch_ids = [c.id for c in new_cases]
+        request.session["session_batch_ids"] = batch_ids
+        # completed_cases still holds the old IDs; new batch IDs are not in it → all pending
+
+    cases = (
+        session.exec(select(Case).where(Case.id.in_(batch_ids)).order_by(Case.id)).all()
+        if batch_ids else []
+    )
+    round_num = request.session.get("eval_round", 1)
+    case_items = [{"case": c, "completed": c.id in completed_cases} for c in cases]
+
     return templates.TemplateResponse(
         "evaluation_list.html",
-        {"request": request, "current_user": user, "case_items": case_items},
+        {"request": request, "current_user": user, "case_items": case_items, "round_num": round_num},
     )
 
 
