@@ -913,18 +913,17 @@ def _compute_agreement(session: Session) -> list[dict]:
 
 
 def _deduplicate_roi(session: Session) -> None:
-    """Keep only one ROI per (output_id, user_id): the most recent. Delete older duplicates."""
+    """Keep only one ROI per (case_id, user_id): the most recent. Delete older duplicates."""
     rois = session.exec(select(EvaluationROI).order_by(EvaluationROI.id)).all()
     by_key: dict[tuple[int, int], list] = {}
     for r in rois:
-        key = (r.output_id, r.user_id)
+        key = (r.case_id, r.user_id)
         if key not in by_key:
             by_key[key] = []
         by_key[key].append(r)
     for key, group in by_key.items():
         if len(group) <= 1:
             continue
-        # Keep the last one (highest id), delete the rest
         group.sort(key=lambda x: x.id)
         for old in group[:-1]:
             session.delete(old)
@@ -964,14 +963,14 @@ _MODEL_ROIS: dict[str, list[dict]] = {
 
 
 def _compute_roi_iou(session: Session) -> list[dict]:
-    """Bounding-box IoU between each doctor's drawn ROI and the model's fixed mock ROI.
+    """Bounding-box IoU between each doctor's single case-level ROI and each model's mock ROI.
 
-    The model ROI is a static polygon defined in _MODEL_ROIS (mock prediction).
-    The doctor ROI is the actual freehand annotation stored in EvaluationROI.
-    IoU is computed from the bounding boxes of those two polygons.
+    The doctor draws one ROI per case (on the shared image). That annotation is
+    compared against the fixed mock predicted ROI of every model output for that case,
+    producing one IoU value per (case, model, doctor).
     """
     _deduplicate_roi(session)
-    rois = session.exec(select(EvaluationROI).join(ModelOutput)).all()
+    rois = session.exec(select(EvaluationROI)).all()
     if not rois:
         return []
 
@@ -979,23 +978,24 @@ def _compute_roi_iou(session: Session) -> list[dict]:
     for r in rois:
         if not _roi_has_drawn_points(r.points_json):
             continue
-        output = session.get(ModelOutput, r.output_id)
-        if not output or not output.case:
+        case = session.get(Case, r.case_id)
+        if not case:
             continue
-        model_roi = _MODEL_ROIS.get(output.model_name)
-        if not model_roi:
-            continue  # no mock ROI defined for this model name
-        case = output.case
         user = session.get(User, r.user_id)
         doctor_points = json.loads(r.points_json)
-        iou = _bbox_iou(doctor_points, model_roi)
-        results.append({
-            "case_id": case.id,
-            "case_title": case.title,
-            "model_name": output.model_name,
-            "doctor": user.username if user else r.annotator_id,
-            "iou": iou,
-        })
+        outputs = session.exec(select(ModelOutput).where(ModelOutput.case_id == r.case_id)).all()
+        for output in outputs:
+            model_roi = _MODEL_ROIS.get(output.model_name)
+            if not model_roi:
+                continue
+            iou = _bbox_iou(doctor_points, model_roi)
+            results.append({
+                "case_id": case.id,
+                "case_title": case.title,
+                "model_name": output.model_name,
+                "doctor": user.username if user else r.annotator_id,
+                "iou": iou,
+            })
     results.sort(key=lambda x: (x["case_id"], x["model_name"], x["doctor"]))
     return results
 
@@ -1077,7 +1077,6 @@ async def save_roi(
     case_id: int,
     request: Request,
     session: SessionDep,
-    output_id: int = Form(...),
     points_json: str = Form(...),
 ):
     user = get_current_user(request, session)
@@ -1086,36 +1085,28 @@ async def save_roi(
     case = session.get(Case, case_id)
     if not case:
         return HTMLResponse("Invalid case", status_code=400)
-    out = session.get(ModelOutput, output_id)
-    if not out or out.case_id != case_id:
-        return HTMLResponse("Invalid case or output", status_code=400)
     if not _roi_has_drawn_points(points_json):
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JSONResponse({"error": "Draw a ROI on the image before saving."}, status_code=400)
         return HTMLResponse("Draw a ROI on the image before saving.", status_code=400)
-    # One ROI per doctor per output: remove any previous ROI for this (output_id, user_id)
+    # One ROI per doctor per case: replace any previous annotation
     existing = session.exec(
         select(EvaluationROI).where(
-            EvaluationROI.output_id == output_id,
+            EvaluationROI.case_id == case_id,
             EvaluationROI.user_id == user.id,
         )
     ).all()
     for old in existing:
         session.delete(old)
     roi = EvaluationROI(
-        output_id=output_id,
+        case_id=case_id,
         user_id=user.id,
         annotator_id=user.username,
         points_json=points_json,
     )
     session.add(roi)
     session.commit()
-    # If called via AJAX, return JSON so the evaluation form is not reloaded
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JSONResponse({"status": "ok"})
-    # Fallback: redirect back to the case page
-    return RedirectResponse(
-        url=f"/evaluation/cases/{case_id}",
-        status_code=303,
-    )
+    return RedirectResponse(url=f"/evaluation/cases/{case_id}", status_code=303)
 

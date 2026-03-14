@@ -86,35 +86,24 @@
           class="w-full object-contain max-h-72 mx-auto block"
           onerror="this.style.display='none'; this.parentElement.querySelector('.img-fallback').style.display='flex';"
         />
-        {% for output in outputs %}
-        <canvas id="roi-canvas-{{ output.id }}" class="absolute inset-0 w-full h-full pointer-events-none hidden" style="max-height: 18rem;"></canvas>
-        {% endfor %}
+        <canvas id="roi-canvas" class="absolute inset-0 w-full h-full pointer-events-none hidden" style="max-height: 18rem;"></canvas>
         <div class="img-fallback hidden flex items-center justify-center text-gray-200 text-xs h-48">
-          Image failed to load (offline-safe placeholder should appear after refresh).
+          Image failed to load.
         </div>
       </div>
       <p class="mt-1 text-xs text-gray-500 text-center">
         Image is illustrative and may represent a single key slice / sequence.
       </p>
-      <div class="mt-2 flex flex-wrap justify-center gap-4">
-        <span class="text-xs text-gray-500 self-center">Optional: </span>
-        {% for output in outputs %}
-        <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-md px-2 py-1">
-          <button type="button" class="roi-toggle text-xs font-medium text-blue-700 hover:text-blue-900" data-output-id="{{ output.id }}" data-model-name="{{ output.model_name }}">
-            Draw ROI for {{ output.model_name }}
-          </button>
-          <div class="roi-form hidden inline-flex items-center gap-2" id="roi-form-{{ output.id }}">
-            <input type="hidden" value="{{ output.id }}" id="roi-output-{{ output.id }}" />
-            <input type="hidden" id="roi-points-{{ output.id }}" value="[]" />
-            <button type="button" id="roi-clear-{{ output.id }}" class="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200">
-              Clear ROI
-            </button>
-            <button type="button" id="roi-save-{{ output.id }}" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
-              Save ROI
-            </button>
-          </div>
+      <div class="mt-2 flex flex-wrap justify-center gap-3">
+        <span class="text-xs text-gray-500 self-center">Optional:</span>
+        <button type="button" id="roi-toggle-btn" class="text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-50 border border-blue-200 rounded-md px-3 py-1">
+          Draw ROI
+        </button>
+        <div class="roi-controls hidden inline-flex items-center gap-2">
+          <input type="hidden" id="roi-points" value="[]" />
+          <button type="button" id="roi-clear-btn" class="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200">Clear</button>
+          <button type="button" id="roi-save-btn" class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">Save ROI</button>
         </div>
-        {% endfor %}
       </div>
     </div>
   </div>
@@ -261,107 +250,95 @@
 
 <script>
 (function() {
-  document.querySelectorAll('.roi-toggle').forEach(function(btn) {
-    var outputId = btn.getAttribute('data-output-id');
-    var canvas = document.getElementById('roi-canvas-' + outputId);
-    var form = document.getElementById('roi-form-' + outputId);
-    var pointsInput = document.getElementById('roi-points-' + outputId);
-    var saveBtn = document.getElementById('roi-save-' + outputId);
-    var clearBtn = document.getElementById('roi-clear-' + outputId);
-    if (!canvas || !form || !pointsInput || !saveBtn) return;
-    var wrap = canvas.parentElement;
-    var drawing = false;
-    var points = [];
+  var canvas = document.getElementById('roi-canvas');
+  var toggleBtn = document.getElementById('roi-toggle-btn');
+  var controls = document.querySelector('.roi-controls');
+  var pointsInput = document.getElementById('roi-points');
+  var clearBtn = document.getElementById('roi-clear-btn');
+  var saveBtn = document.getElementById('roi-save-btn');
+  if (!canvas || !toggleBtn) return;
 
-    function setCanvasSize() {
-      var r = wrap.getBoundingClientRect();
-      canvas.width = r.width;
-      canvas.height = r.height;
-      canvas.style.pointerEvents = canvas.classList.contains('hidden') ? 'none' : 'auto';
+  var wrap = canvas.parentElement;
+  var drawing = false;
+  var points = [];
+
+  function setCanvasSize() {
+    var r = wrap.getBoundingClientRect();
+    canvas.width = r.width;
+    canvas.height = r.height;
+  }
+
+  function norm(x, y) {
+    var r = wrap.getBoundingClientRect();
+    return { x: (x - r.left) / r.width, y: (y - r.top) / r.height };
+  }
+
+  function drawPath() {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (points.length < 2) return;
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
+    for (var i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x * canvas.width, points[i].y * canvas.height);
     }
+    ctx.stroke();
+  }
 
-    function norm(x, y) {
-      var r = wrap.getBoundingClientRect();
-      return { x: (x - r.left) / r.width, y: (y - r.top) / r.height };
+  toggleBtn.addEventListener('click', function() {
+    canvas.classList.remove('hidden');
+    canvas.style.pointerEvents = 'auto';
+    controls.classList.remove('hidden');
+    toggleBtn.classList.add('hidden');
+    setCanvasSize();
+  });
+
+  canvas.addEventListener('mousedown', function(e) {
+    drawing = true;
+    points = [];
+    points.push(norm(e.clientX, e.clientY));
+    drawPath();
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    if (!drawing) return;
+    points.push(norm(e.clientX, e.clientY));
+    drawPath();
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    if (!drawing) return;
+    drawing = false;
+    pointsInput.value = JSON.stringify(points);
+  });
+
+  clearBtn.addEventListener('click', function() {
+    points = [];
+    pointsInput.value = '[]';
+    drawPath();
+  });
+
+  saveBtn.addEventListener('click', function() {
+    if (!pointsInput.value || pointsInput.value === '[]') {
+      alert('Draw a ROI on the image before saving.');
+      return;
     }
-
-    function drawPath() {
-      var ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (points.length < 2) {
-        return;
-      }
-      ctx.strokeStyle = 'lime';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
-      for (var i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x * canvas.width, points[i].y * canvas.height);
-      }
-      ctx.stroke();
-    }
-
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.roi-form').forEach(function(f) { f.classList.add('hidden'); });
-      document.querySelectorAll('[id^="roi-canvas-"]').forEach(function(c) { c.classList.add('hidden'); c.style.pointerEvents = 'none'; });
-      canvas.classList.remove('hidden');
-      canvas.style.pointerEvents = 'auto';
-      form.classList.remove('hidden');
-      setCanvasSize();
-    });
-
-    canvas.addEventListener('mousedown', function(e) {
-      drawing = true;
-      points = [];
-      points.push(norm(e.clientX, e.clientY));
-      drawPath();
-    });
-
-    canvas.addEventListener('mousemove', function(e) {
-      if (!drawing) return;
-      points.push(norm(e.clientX, e.clientY));
-      drawPath();
-    });
-
-    canvas.addEventListener('mouseup', function() {
-      if (!drawing) return;
-      drawing = false;
-      pointsInput.value = JSON.stringify(points);
-    });
-
-    if (clearBtn) {
-      clearBtn.addEventListener('click', function() {
-        points = [];
-        pointsInput.value = '[]';
-        drawPath();
-      });
-    }
-
-    saveBtn.addEventListener('click', function() {
-      if (!pointsInput.value || pointsInput.value === "[]") {
-        alert("Draw a ROI line on the image before saving.");
-        return;
-      }
-      var formData = new FormData();
-      formData.append("output_id", outputId);
-      formData.append("points_json", pointsInput.value);
-      fetch("/evaluation/cases/{{ case.id }}/roi", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-Requested-With": "XMLHttpRequest"
-        }
-      }).then(function(resp) {
-        if (!resp.ok) {
-          throw new Error("Failed to save ROI");
-        }
-        return resp.json();
-      }).then(function() {
-        // keep the evaluation form as is; optionally give a small confirmation
-        alert("ROI saved.");
-      }).catch(function() {
-        alert("Could not save ROI. Please try again.");
-      });
+    var formData = new FormData();
+    formData.append('points_json', pointsInput.value);
+    fetch('/evaluation/cases/{{ case.id }}/roi', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function(resp) {
+      if (!resp.ok) throw new Error();
+      return resp.json();
+    }).then(function() {
+      saveBtn.textContent = 'ROI saved ✓';
+      saveBtn.disabled = true;
+    }).catch(function() {
+      alert('Could not save ROI. Please try again.');
     });
   });
 })();

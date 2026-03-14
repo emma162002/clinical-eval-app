@@ -58,12 +58,17 @@ class Evaluation(SQLModel, table=True):
 
 
 class EvaluationROI(SQLModel, table=True):
-    """Region-of-interest annotation on an image (output)."""
+    """Region-of-interest annotation drawn by a clinician on a case image.
+
+    One ROI per (case_id, user_id): the clinician draws once on the shared
+    image and the same annotation is compared against every model output for
+    that case.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
-    output_id: int = Field(foreign_key="modeloutput.id")
+    case_id: int = Field(foreign_key="case.id")
     user_id: int = Field(foreign_key="users.id")
     annotator_id: str = Field()
-    points_json: str = Field()  # JSON array of {x,y} or [{x,y},...] for polygon
+    points_json: str = Field()  # JSON array of {x, y} normalised coordinates
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

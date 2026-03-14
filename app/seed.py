@@ -5,6 +5,10 @@ from .models import Case, ModelOutput, User
 
 CHEST_XRAY_URL = "https://upload.wikimedia.org/wikipedia/commons/f/fc/Chest_X-ray.jpg"
 BRAIN_MRI_URL = "https://upload.wikimedia.org/wikipedia/commons/3/3b/MRI_brain.jpg"
+PNEUMONIA_XRAY_URL = "https://upload.wikimedia.org/wikipedia/commons/5/51/X-ray_of_lobar_pneumonia.jpg"
+LIVER_CT_URL = "https://upload.wikimedia.org/wikipedia/commons/1/1f/Hepatomegaly_-_CT_single_angle.jpg"
+KNEE_MRI_URL = "https://upload.wikimedia.org/wikipedia/commons/9/9e/MRI_meniscus_tear.jpg"
+MAMMO_URL = "https://upload.wikimedia.org/wikipedia/commons/3/35/Mammogram_with_obvious_cancer.jpg"
 
 SAMPLE_CASES = [
     {
@@ -88,7 +92,7 @@ SAMPLE_CASES = [
                     "pneumothorax identified. Cardiomediastinal silhouette is within normal limits. "
                     "Bony thorax is intact. No acute cardiopulmonary process."
                 ),
-                "image_url": CHEST_XRAY_URL,
+                "image_url": PNEUMONIA_XRAY_URL,
             },
         ],
     },
@@ -110,7 +114,7 @@ SAMPLE_CASES = [
                     "ascites indicate portal hypertension. No vascular invasion or extrahepatic disease. "
                     "Multidisciplinary tumour board review is recommended."
                 ),
-                "image_url": None,
+                "image_url": LIVER_CT_URL,
             },
             {
                 "model_name": "Model D",
@@ -119,7 +123,7 @@ SAMPLE_CASES = [
                     "noted. The liver background is abnormal. Spleen is enlarged. Clinical correlation "
                     "is advised. Further imaging may be required."
                 ),
-                "image_url": None,
+                "image_url": LIVER_CT_URL,
             },
         ],
     },
@@ -141,7 +145,7 @@ SAMPLE_CASES = [
                     "compartment chondral thinning (ICRS grade II). Small joint effusion. Orthopaedic "
                     "surgical review is recommended."
                 ),
-                "image_url": None,
+                "image_url": KNEE_MRI_URL,
             },
             {
                 "model_name": "Model B",
@@ -151,7 +155,7 @@ SAMPLE_CASES = [
                     "appear possibly intact, though evaluation is limited. No large effusion. Clinical "
                     "correlation with physical examination findings is suggested."
                 ),
-                "image_url": None,
+                "image_url": KNEE_MRI_URL,
             },
         ],
     },
@@ -172,7 +176,7 @@ SAMPLE_CASES = [
                     "lymphadenopathy identified. BI-RADS 4C — high suspicion for malignancy. "
                     "Ultrasound-guided core needle biopsy is recommended."
                 ),
-                "image_url": None,
+                "image_url": MAMMO_URL,
             },
             {
                 "model_name": "Model D",
@@ -181,7 +185,7 @@ SAMPLE_CASES = [
                     "difficult to assess on current views. BI-RADS 0 — incomplete assessment. "
                     "Additional imaging views are recommended."
                 ),
-                "image_url": None,
+                "image_url": MAMMO_URL,
             },
         ],
     },
